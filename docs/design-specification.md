@@ -48,31 +48,31 @@ These come from the feasibility analysis and bind every decision below.
 ## 3. High-level architecture
 
 ```
-┌──────────────────────────────────────────┐
-│            Obsidian Plugin               │
-│                                          │
+┌─────────────────────────────────────────┐
+│            Obsidian Plugin              │
+│                                         │
 │   ┌────────────┐    ┌──────────────┐    │
 │   │  Sync      │◄──►│  GitHub      │    │
 │   │  Engine    │    │  REST Client │    │
 │   └─────┬──────┘    └──────┬───────┘    │
-│         │                  │             │
-│   ┌─────▼──────┐           │             │
-│   │ State      │           │             │
-│   │ Store      │           │             │
-│   └─────┬──────┘           │             │
-│         │                  │             │
+│         │                  │            │
+│   ┌─────▼──────┐           │            │
+│   │ State      │           │            │
+│   │ Store      │           │            │
+│   └─────┬──────┘           │            │
+│         │                  │            │
 │   ┌─────▼──────────────────▼────────┐   │
 │   │   Obsidian Vault API            │   │
 │   └────────────┬────────────────────┘   │
-│                │                         │
-│         ┌──────▼──────┐                  │
-│         │  Logger     │  (local file)    │
-│         └─────────────┘                  │
-│                                          │
+│                │                        │
+│         ┌──────▼──────┐                 │
+│         │  Logger     │  (local file)   │
+│         └─────────────┘                 │
+│                                         │
 │   ┌─────────────────────────────────┐   │
 │   │   UI: Settings, Status, Diff    │   │
 │   └─────────────────────────────────┘   │
-└──────────────────────────────────────────┘
+└─────────────────────────────────────────┘
                  │
                  │ HTTPS (requestUrl)
                  ▼
@@ -113,8 +113,8 @@ The "last known synced state" is the union of all such records, plus the head co
 ```ts
 interface SyncState {
   schemaVersion: 1;
-  lastSyncCommitSha: string | null;    // null before first sync
-  lastSyncAt: string;                   // ISO 8601
+  lastSyncCommitSha: string | null;         // null before first sync
+  lastSyncAt: string;                       // ISO 8601
   files: Record<string, SyncedFileRecord>;  // keyed by path
 }
 ```
