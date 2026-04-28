@@ -565,26 +565,11 @@ Captured here so they're not lost.
 
 ## 13. Licensing
 
-User has no preference and typically defaults to MIT. Tradeoffs:
+**Decision: MIT License.**
 
-**MIT**
-- *Pro:* Maximum permissiveness. Anyone can fork, embed, or commercialize. Best for adoption and contribution from people who work at companies with strict policies against AGPL/copyleft code (this is a real, common issue).
-- *Pro:* Compatible with virtually any other license. The Obsidian plugin ecosystem skews MIT/Apache, so contributors won't blink.
-- *Con:* A future commercial competitor could fork the plugin, add proprietary features (e.g. "GitHub Sync Pro for $5/mo"), and the user has no recourse.
+Jackdaw is released under the MIT License. See `LICENSE` in the repository root.
 
-**AGPLv3** (what `silvanocerza/github-gitless-sync` uses)
-- *Pro:* Forks must remain open-source, and the network-use clause means even SaaS-style hosting is covered. Discourages closed-source competitive forks.
-- *Con:* Many companies (and some individual contributors) outright refuse to touch AGPL code. Reduces contribution surface.
-- *Con:* For a client-side Obsidian plugin, the network-use clause is mostly theoretical — the plugin runs on the user's device, not on a service.
-- *Con:* Some Obsidian users may be wary of installing AGPL plugins into a vault they treat as a creative work, though this is more vibe than legal risk.
-
-**Apache 2.0**
-- *Pro:* Same permissiveness as MIT but with explicit patent grant — useful protection if any of the plugin's mechanisms are patentable (probably none are, but it's free defense).
-- *Con:* Slightly more text to include. Marginally less common in the Obsidian ecosystem than MIT.
-
-**Recommendation:** MIT. The user's default is the right default here. The AGPL "no closed-source forks" benefit is small for a plugin that depends on Obsidian (which is itself closed-source) and uses GitHub's API (a third-party SaaS). The MIT downside (commercial fork risk) is theoretically possible but rare in this ecosystem.
-
-If the user wants slightly stronger IP protection without giving up adoption, Apache 2.0 is the conservative alternative.
+Rationale: maximum permissiveness with zero friction for contributors. The Obsidian plugin ecosystem skews MIT, AGPL's network-use clause is largely theoretical for a client-side plugin, and Apache 2.0's patent grant adds little value given the plugin's implementation surface.
 
 ---
 
