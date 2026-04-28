@@ -4,6 +4,8 @@
   "description": "Manual, bidirectional, one-button sync between an Obsidian vault and a GitHub repository branch",
   "main": "main.js",
   "scripts": {
+    "build": "node esbuild.config.mjs",
+    "dev": "node esbuild.config.mjs --watch",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src/ --ext .ts"
   },
@@ -13,6 +15,7 @@
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@typescript-eslint/parser": "^7.0.0",
+    "esbuild": "^0.28.0",
     "eslint": "^8.57.0",
     "obsidian": "latest",
     "typescript": "^5.4.0"
