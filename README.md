@@ -35,4 +35,4 @@ Six modules make up the plugin:
 - [Design Specification](docs/design-specification.md)
 - [Workflow](docs/workflow.md)
 - [Human Interaction Gates](docs/human-interactions.md)
-- [ADR: MIT License](docs/adr/001-mit-license.md)
+- [ADRs](docs/adr/)
