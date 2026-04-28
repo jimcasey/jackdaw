@@ -49,7 +49,7 @@ If the session opens with a message that is solely an issue number (e.g. `#40` o
 ## Pull requests
 
 - Keep PR titles short and descriptive; do not include issue references in the title.
-- Reference issues in the PR description using `Closes #N` (or `Fixes #N`). GitHub automatically closes the linked issue on squash-merge even when the keyword is in the description rather than the title.
+- **Always** include `Closes #N` (or `Fixes #N`) in the PR description body — never in the title. GitHub auto-closes the linked issue on squash-merge only when the keyword appears in the description. This is required for every PR that resolves an issue; do not skip it.
 
 ## Architecture
 
