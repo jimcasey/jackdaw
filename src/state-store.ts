@@ -16,8 +16,8 @@ export interface SyncState {
 export const SCHEMA_VERSION = 1 as const;
 
 export interface Logger {
-	info(event: string, data?: Record<string, unknown>): void;
-	warn(event: string, data?: Record<string, unknown>): void;
+	info(event: string, data?: Record<string, unknown>): Promise<void>;
+	warn(event: string, data?: Record<string, unknown>): Promise<void>;
 }
 
 export interface StateAdapter {
@@ -51,29 +51,39 @@ export class StateStore {
 
 		let raw: string;
 		if (!canonicalExists && tmpExists) {
-			raw = await this.adapter.read(this.tmpPath);
-			this.logger.info('state.recover', { path: this.tmpPath });
+			try {
+				raw = await this.adapter.read(this.tmpPath);
+			} catch {
+				await this.logger.warn('state.corrupt', { reason: 'read-error' });
+				return null;
+			}
+			await this.logger.info('state.recover', { path: this.tmpPath });
 			await this.adapter.rename(this.tmpPath, this.canonicalPath);
 		} else {
-			raw = await this.adapter.read(this.canonicalPath);
+			try {
+				raw = await this.adapter.read(this.canonicalPath);
+			} catch {
+				await this.logger.warn('state.corrupt', { reason: 'read-error' });
+				return null;
+			}
 		}
 
 		let parsed: unknown;
 		try {
 			parsed = JSON.parse(raw);
 		} catch {
-			this.logger.warn('state.corrupt', { reason: 'invalid-json' });
+			await this.logger.warn('state.corrupt', { reason: 'invalid-json' });
 			return null;
 		}
 
 		if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-			this.logger.warn('state.corrupt', { reason: 'not-an-object' });
+			await this.logger.warn('state.corrupt', { reason: 'not-an-object' });
 			return null;
 		}
 
 		const obj = parsed as Record<string, unknown>;
 		if (obj['schemaVersion'] !== SCHEMA_VERSION) {
-			this.logger.warn('state.schema-mismatch', {
+			await this.logger.warn('state.schema-mismatch', {
 				expected: SCHEMA_VERSION,
 				found: obj['schemaVersion'],
 			});

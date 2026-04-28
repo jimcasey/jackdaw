@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, type Mock } from 'vitest';
-import { StateStore, SCHEMA_VERSION, type SyncState, type Logger, type StateAdapter } from './state-store';
+import { StateStore, type SyncState, type Logger, type StateAdapter } from './state-store';
 
 const PLUGIN_FOLDER = '.obsidian/plugins/jackdaw';
 const CANONICAL = `${PLUGIN_FOLDER}/sync-state.json`;
@@ -31,8 +31,8 @@ function makeLogger(): Logger & { warns: string[]; infos: string[] } {
 	return {
 		warns,
 		infos,
-		warn(event: string) { warns.push(event); },
-		info(event: string) { infos.push(event); },
+		warn(event: string) { warns.push(event); return Promise.resolve(); },
+		info(event: string) { infos.push(event); return Promise.resolve(); },
 	};
 }
 
@@ -118,6 +118,36 @@ describe('StateStore', () => {
 		expect(logger.infos).toContain('state.recover');
 	});
 
+	test('recovery: read error on .tmp returns null and logs state.corrupt', async () => {
+		const adapter = makeAdapter();
+		adapter.exists.mockImplementation((path: string) =>
+			Promise.resolve(path === TMP),
+		);
+		adapter.read.mockRejectedValue(new Error('fs error'));
+
+		const logger = makeLogger();
+		const store = new StateStore(asAdapter(adapter), PLUGIN_FOLDER, logger);
+		expect(await store.load()).toBeNull();
+		expect(logger.warns).toContain('state.corrupt');
+	});
+
+	test('both files exist: reads canonical and ignores .tmp', async () => {
+		const adapter = makeAdapter();
+		const state = makeState();
+		adapter.exists.mockResolvedValue(true);
+		adapter.read.mockImplementation((path: string) => {
+			if (path === CANONICAL) return Promise.resolve(JSON.stringify(state));
+			return Promise.reject(new Error('should not read .tmp'));
+		});
+
+		const store = new StateStore(asAdapter(adapter), PLUGIN_FOLDER, makeLogger());
+		const loaded = await store.load();
+
+		expect(loaded).toEqual(state);
+		expect(adapter.read).toHaveBeenCalledWith(CANONICAL);
+		expect(adapter.read).not.toHaveBeenCalledWith(TMP);
+	});
+
 	test('corrupt JSON: load() returns null and logs state.corrupt', async () => {
 		const adapter = makeAdapter();
 		adapter.exists.mockImplementation((path: string) =>
@@ -143,9 +173,5 @@ describe('StateStore', () => {
 		const store = new StateStore(asAdapter(adapter), PLUGIN_FOLDER, logger);
 		expect(await store.load()).toBeNull();
 		expect(logger.warns).toContain('state.schema-mismatch');
-	});
-
-	test('SCHEMA_VERSION is 1', () => {
-		expect(SCHEMA_VERSION).toBe(1);
 	});
 });
