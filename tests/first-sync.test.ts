@@ -119,6 +119,19 @@ describe('buildLocalInventory', () => {
 		expect(entry?.isBinary).toBe(true);
 		expect(entry?.bytes).toBeDefined();
 	});
+
+	test('file matching user exclude pattern → not in output', async () => {
+		const settings = { ...BASE_SETTINGS, excludePatterns: ['*.tmp', '.DS_Store'] };
+		const adapter = makeAdapter({
+			listFiles: ['notes.md', 'scratch.tmp', '.DS_Store'],
+			textContent: { 'notes.md': 'hi', 'scratch.tmp': 'temp', '.DS_Store': 'meta' },
+		});
+		const result = await buildLocalInventory(adapter, settings);
+
+		expect(result.has('notes.md')).toBe(true);
+		expect(result.has('scratch.tmp')).toBe(false);
+		expect(result.has('.DS_Store')).toBe(false);
+	});
 });
 
 describe('buildFirstSyncSummary', () => {
@@ -214,5 +227,33 @@ describe('buildFirstSyncSummary', () => {
 		expect(summary.identical).toEqual(['shared.md']);
 		expect(summary.conflicts).toHaveLength(1);
 		expect(summary.conflicts[0].path).toBe('conflict.md');
+	});
+
+	test('empty local and empty remote → all arrays empty', async () => {
+		const summary = await buildFirstSyncSummary(
+			new Map<string, LocalChange>(),
+			new Map<string, RemoteChange>(),
+		);
+
+		expect(summary.localOnly).toHaveLength(0);
+		expect(summary.remoteOnly).toHaveLength(0);
+		expect(summary.identical).toHaveLength(0);
+		expect(summary.conflicts).toHaveLength(0);
+	});
+
+	test('remote entry with undefined blobSha → conflict', async () => {
+		const bytes = toBytes('some content');
+		const localInventory = new Map<string, LocalChange>([
+			['notes/file.md', await localEntry('notes/file.md', bytes)],
+		]);
+		const remoteTree = new Map<string, RemoteChange>([
+			['notes/file.md', { path: 'notes/file.md', type: 'added', blobSha: undefined, size: 0, isBinary: false }],
+		]);
+
+		const summary = await buildFirstSyncSummary(localInventory, remoteTree);
+
+		expect(summary.conflicts).toHaveLength(1);
+		expect(summary.conflicts[0].path).toBe('notes/file.md');
+		expect(summary.identical).toHaveLength(0);
 	});
 });
