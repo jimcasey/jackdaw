@@ -280,19 +280,15 @@ describe('applyPush', () => {
 		).rejects.toThrow(GHFastForwardError);
 	});
 
-	test('state updated correctly after successful push', async () => {
+	test('modified path: state record updated with new blobSha and lastSyncAt refreshed', async () => {
 		const client = makeClient();
 		client.createBlob.mockResolvedValue({ sha: 'new-blob-sha' });
 
-		const existingRecord = {
-			path: 'modified.md',
-			blobSha: 'old-blob',
-			contentHash: 'old-hash',
-			size: 5,
-			isBinary: false,
-		};
-		const state = makeState({ files: { 'modified.md': existingRecord } });
-
+		const state = makeState({
+			files: {
+				'modified.md': { path: 'modified.md', blobSha: 'old-blob', contentHash: 'old-hash', size: 5, isBinary: false },
+			},
+		});
 		const local = new Map([['modified.md', makeLocalChange('modified.md', 'modified', 'new content')]]);
 		const paths = [makeClassified('modified.md', 'modified')];
 
@@ -318,10 +314,67 @@ describe('applyPush', () => {
 		expect(result.updatedState.files['modified.md']).toEqual({
 			path: 'modified.md',
 			blobSha: 'new-blob-sha',
-			contentHash: `hash-modified.md`,
+			contentHash: 'hash-modified.md',
 			size: local.get('modified.md')!.size,
 			isBinary: false,
 		});
+	});
+
+	test('added path: new SyncedFileRecord created in state', async () => {
+		const client = makeClient();
+		client.createBlob.mockResolvedValue({ sha: 'new-blob-sha' });
+
+		const state = makeState(); // no pre-existing files
+		const local = new Map([['new.md', makeLocalChange('new.md', 'added', 'hello')]]);
+		const paths = [makeClassified('new.md', 'added')];
+
+		const result = await applyPush(
+			paths,
+			local,
+			state,
+			asClient(client),
+			makeSettings(),
+			'remote-head',
+			'remote-tree',
+			makeLogger(),
+		);
+
+		expect(result.updatedState.files['new.md']).toEqual({
+			path: 'new.md',
+			blobSha: 'new-blob-sha',
+			contentHash: 'hash-new.md',
+			size: local.get('new.md')!.size,
+			isBinary: false,
+		});
+	});
+
+	test('keep-local conflict resolution: path with action=conflict is pushed based on local change type', async () => {
+		const client = makeClient();
+		client.createBlob.mockResolvedValue({ sha: 'conflict-blob-sha' });
+
+		const state = makeState({
+			files: {
+				'conflict.md': { path: 'conflict.md', blobSha: 'old-blob', contentHash: 'old-hash', size: 5, isBinary: false },
+			},
+		});
+		const local = new Map([['conflict.md', makeLocalChange('conflict.md', 'modified', 'local wins')]]);
+		// action is 'conflict' but caller resolved as keep-local, so it's passed to applyPush
+		const paths = [makeClassified('conflict.md', 'modified', 'conflict', 'modified')];
+
+		const result = await applyPush(
+			paths,
+			local,
+			state,
+			asClient(client),
+			makeSettings(),
+			'remote-head',
+			'remote-tree',
+			makeLogger(),
+		);
+
+		expect(client.createBlob).toHaveBeenCalledTimes(1);
+		expect(result.updatedState.files['conflict.md'].blobSha).toBe('conflict-blob-sha');
+		expect(result.newCommitSha).toBe('new-commit-sha');
 	});
 
 	test('deleted files removed from state after push', async () => {

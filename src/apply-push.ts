@@ -58,17 +58,17 @@ export async function applyPush(
 	const deleted: string[] = [];
 
 	for (const classified of paths) {
-		const type = local.get(classified.path)?.type;
-		if (type === 'added') added.push(classified.path);
-		else if (type === 'modified') modified.push(classified.path);
-		else if (type === 'deleted') deleted.push(classified.path);
+		if (classified.local === 'added') added.push(classified.path);
+		else if (classified.local === 'modified') modified.push(classified.path);
+		else if (classified.local === 'deleted') deleted.push(classified.path);
 	}
 
 	// Create blobs serially to avoid secondary rate limit hits
 	const blobMap = new Map<string, string>();
 	for (const path of [...added, ...modified]) {
 		const change = local.get(path)!;
-		const { sha } = await client.createBlob(owner, repo, change.bytes!, change.isBinary);
+		if (!change.bytes) throw new Error(`Missing bytes for '${path}': added/modified LocalChange must include bytes`);
+		const { sha } = await client.createBlob(owner, repo, change.bytes, change.isBinary);
 		blobMap.set(path, sha);
 		await logger.debug('sync.push.file', { path });
 	}
