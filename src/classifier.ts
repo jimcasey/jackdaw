@@ -1,6 +1,8 @@
 import type { LocalChange, RemoteChange, LocalChangeType, RemoteChangeType, ClassifyAction, ClassifiedPath } from './sync-engine-types';
 import type { SyncState } from './state-store';
 
+// Intentionally sync — classify() is pure with no I/O. Callers using the async
+// Logger from state-store.ts need to wrap it (e.g. (e, d) => void logger.warn(e, d)).
 export interface ClassifierLogger {
 	warn(event: string, data?: Record<string, unknown>): void;
 }
@@ -8,7 +10,7 @@ export interface ClassifierLogger {
 export function classify(
 	localChanges: Map<string, LocalChange>,
 	remoteChanges: Map<string, RemoteChange>,
-	_state: SyncState,
+	_state: SyncState, // reserved — staleness comparison (§4.4) is deferred to the pull phase
 	logger?: ClassifierLogger,
 ): ClassifiedPath[] {
 	const allPaths = new Set([...localChanges.keys(), ...remoteChanges.keys()]);

@@ -20,11 +20,7 @@ function makeRemote(path: string, type: RemoteChange['type'], blobSha = 'blobsha
 }
 
 function makeLogger() {
-	const warns: Array<[string, Record<string, unknown> | undefined]> = [];
-	return {
-		warn: vi.fn((event: string, data?: Record<string, unknown>) => { warns.push([event, data]); }),
-		warns,
-	};
+	return { warn: vi.fn<[string, (Record<string, unknown> | undefined)?], void>() };
 }
 
 const EMPTY = new Map<string, LocalChange>();
@@ -66,17 +62,10 @@ test('(added, added) — conflict (hash comparison deferred to pull phase)', () 
 	expect(result[0]).toMatchObject({ action: 'conflict', local: 'added', remote: 'added' });
 });
 
-describe('(added, added) same-content escape: classifier returns conflict regardless of hash values', () => {
-	test('with matching content hash values — still conflict (deferred)', () => {
-		// sha256 vs git blob sha1 can't be directly compared; classifier always returns conflict
-		const result = classify(makeLocal('a.md', 'added', 'same'), makeRemote('a.md', 'added', 'same'), EMPTY_STATE);
-		expect(result[0]).toMatchObject({ action: 'conflict' });
-	});
-
-	test('with differing hash values — conflict', () => {
-		const result = classify(makeLocal('a.md', 'added', 'hash-a'), makeRemote('a.md', 'added', 'hash-b'), EMPTY_STATE);
-		expect(result[0]).toMatchObject({ action: 'conflict' });
-	});
+test('(added, added) always conflict — sha256 vs git blob sha1 cannot be compared without I/O', () => {
+	// Hash comparison (same-content escape) is deferred to the pull phase; classifier has no I/O
+	const result = classify(makeLocal('a.md', 'added', 'hash-a'), makeRemote('a.md', 'added', 'hash-b'), EMPTY_STATE);
+	expect(result[0]).toMatchObject({ action: 'conflict' });
 });
 
 test('(added, modified) — impossible: logs warning and returns no-op', () => {
@@ -162,10 +151,6 @@ test('multiple paths are each classified independently', () => {
 });
 
 test('no logger provided for impossible cell: still returns no-op without throwing', () => {
-	// Verifies defensive behaviour with no logger passed
-	expect(() => {
-		classify(makeLocal('a.md', 'added'), makeRemote('a.md', 'modified'), EMPTY_STATE);
-	}).not.toThrow();
 	const result = classify(makeLocal('a.md', 'added'), makeRemote('a.md', 'modified'), EMPTY_STATE);
 	expect(result[0].action).toBe('no-op');
 });
