@@ -190,7 +190,7 @@ function makeEngine(
 function setupNoChanges() {
 	vi.mocked(buildLocalChangeSet).mockResolvedValue(new Map());
 	vi.mocked(buildRemoteChangeSet).mockResolvedValue(new Map());
-	vi.mocked(classify).mockReturnValue([]);
+	vi.mocked(classify).mockResolvedValue([]);
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +273,7 @@ describe('sync lock', () => {
 		const conflictPath = makeClassified('conflict.md', 'conflict', 'modified', 'modified');
 		vi.mocked(buildLocalChangeSet).mockResolvedValue(new Map([['conflict.md', makeLocalChange('conflict.md', 'modified')]]));
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(new Map([['conflict.md', makeRemoteChange('conflict.md', 'modified')]]));
-		vi.mocked(classify).mockReturnValue([conflictPath]);
+		vi.mocked(classify).mockResolvedValue([conflictPath]);
 		conflicts.resolve.mockResolvedValue('cancel');
 
 		const result1 = await engine.sync();
@@ -307,6 +307,32 @@ describe('normal sync', () => {
 		expect(stateStore.save).toHaveBeenCalled();
 	});
 
+	test('state-refresh paths → state updated, no pull/push, up-to-date', async () => {
+		const state = makeState({ files: {} });
+		const { engine, stateStore } = makeEngine({ stateStore: makeStateStore(state) });
+
+		const stalePath = makeClassified('stale.md', 'state-refresh', 'modified', 'modified');
+		vi.mocked(buildLocalChangeSet).mockResolvedValue(
+			new Map([['stale.md', makeLocalChange('stale.md', 'modified')]]),
+		);
+		vi.mocked(buildRemoteChangeSet).mockResolvedValue(
+			new Map([['stale.md', makeRemoteChange('stale.md', 'modified')]]),
+		);
+		vi.mocked(classify).mockResolvedValue([stalePath]);
+
+		const result = await engine.sync();
+
+		expect(result.status).toBe('up-to-date');
+		expect(applyPull).not.toHaveBeenCalled();
+		expect(applyPush).not.toHaveBeenCalled();
+		// State should have been updated with the refreshed record
+		const savedState = stateStore.save.mock.calls[0]?.[0] as typeof state;
+		expect(savedState.files['stale.md']).toMatchObject({
+			blobSha: 'blob-stale.md',
+			contentHash: 'hash-stale.md',
+		});
+	});
+
 	test('remote-only changes → pull path exercised, state saved, status success', async () => {
 		const state = makeState();
 		const updatedState = makeState({ lastSyncCommitSha: 'remote-head' });
@@ -317,7 +343,7 @@ describe('normal sync', () => {
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(
 			new Map([['remote-note.md', makeRemoteChange('remote-note.md', 'added')]]),
 		);
-		vi.mocked(classify).mockReturnValue([remotePath]);
+		vi.mocked(classify).mockResolvedValue([remotePath]);
 		vi.mocked(applyPull).mockResolvedValue({ updatedState, skipped: [] });
 
 		const result = await engine.sync();
@@ -343,7 +369,7 @@ describe('normal sync', () => {
 			new Map([['local-note.md', makeLocalChange('local-note.md', 'added')]]),
 		);
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(new Map());
-		vi.mocked(classify).mockReturnValue([localPath]);
+		vi.mocked(classify).mockResolvedValue([localPath]);
 		vi.mocked(applyPush).mockResolvedValue({ newCommitSha: 'new-commit-sha', updatedState });
 
 		const result = await engine.sync();
@@ -367,7 +393,7 @@ describe('normal sync', () => {
 			new Map([['gone.md', makeLocalChange('gone.md', 'deleted')]]),
 		);
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(new Map());
-		vi.mocked(classify).mockReturnValue([localPath]);
+		vi.mocked(classify).mockResolvedValue([localPath]);
 		vi.mocked(applyPush).mockResolvedValue({ newCommitSha: 'new-commit', updatedState });
 
 		const result = await engine.sync();
@@ -394,7 +420,7 @@ describe('normal sync', () => {
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(
 			new Map([['conflict.md', makeRemoteChange('conflict.md', 'modified')]]),
 		);
-		vi.mocked(classify).mockReturnValue([conflictPath]);
+		vi.mocked(classify).mockResolvedValue([conflictPath]);
 		vi.mocked(applyPush).mockResolvedValue({ newCommitSha: 'new-commit', updatedState });
 
 		const result = await engine.sync();
@@ -422,7 +448,7 @@ describe('normal sync', () => {
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(
 			new Map([['conflict.md', makeRemoteChange('conflict.md', 'modified')]]),
 		);
-		vi.mocked(classify).mockReturnValue([conflictPath]);
+		vi.mocked(classify).mockResolvedValue([conflictPath]);
 		vi.mocked(applyPull).mockResolvedValue({ updatedState, skipped: [] });
 
 		const result = await engine.sync();
@@ -443,7 +469,7 @@ describe('normal sync', () => {
 		const conflictPath = makeClassified('conflict.md', 'conflict', 'modified', 'modified');
 		vi.mocked(buildLocalChangeSet).mockResolvedValue(new Map());
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(new Map());
-		vi.mocked(classify).mockReturnValue([conflictPath]);
+		vi.mocked(classify).mockResolvedValue([conflictPath]);
 		conflicts.resolve.mockResolvedValue('cancel');
 
 		const result = await engine.sync();
@@ -467,7 +493,7 @@ describe('normal sync', () => {
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(
 			new Map([['conflict.md', makeRemoteChange('conflict.md', 'modified')]]),
 		);
-		vi.mocked(classify).mockReturnValue([conflictPath]);
+		vi.mocked(classify).mockResolvedValue([conflictPath]);
 		conflicts.resolve.mockResolvedValue(new Map([['conflict.md', 'keep-local']]));
 		vi.mocked(applyPush).mockResolvedValue({ newCommitSha: 'new-commit', updatedState });
 
@@ -488,7 +514,7 @@ describe('normal sync', () => {
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(
 			new Map([['large.zip', makeRemoteChange('large.zip', 'added')]]),
 		);
-		vi.mocked(classify).mockReturnValue([pullPath]);
+		vi.mocked(classify).mockResolvedValue([pullPath]);
 		vi.mocked(applyPull).mockResolvedValue({ updatedState, skipped: ['large.zip'] });
 
 		const result = await engine.sync();
@@ -515,7 +541,7 @@ describe('GHFastForwardError retry', () => {
 			new Map([['note.md', makeLocalChange('note.md', 'modified')]]),
 		);
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(new Map());
-		vi.mocked(classify).mockReturnValue([pushPath]);
+		vi.mocked(classify).mockResolvedValue([pushPath]);
 		vi.mocked(applyPull).mockResolvedValue({ updatedState: state, skipped: [] });
 		vi.mocked(applyPush)
 			.mockRejectedValueOnce(new GHFastForwardError('ff required'))
@@ -538,7 +564,7 @@ describe('GHFastForwardError retry', () => {
 			new Map([['note.md', makeLocalChange('note.md', 'modified')]]),
 		);
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(new Map());
-		vi.mocked(classify).mockReturnValue([pushPath]);
+		vi.mocked(classify).mockResolvedValue([pushPath]);
 		vi.mocked(applyPush)
 			.mockRejectedValueOnce(new GHFastForwardError('ff'))
 			.mockRejectedValueOnce(new GHFastForwardError('ff'))
@@ -560,7 +586,7 @@ describe('GHFastForwardError retry', () => {
 			new Map([['note.md', makeLocalChange('note.md', 'modified')]]),
 		);
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(new Map());
-		vi.mocked(classify).mockReturnValue([pushPath]);
+		vi.mocked(classify).mockResolvedValue([pushPath]);
 		vi.mocked(applyPush).mockRejectedValue(new GHFastForwardError('ff'));
 
 		const result = await engine.sync();
@@ -584,7 +610,7 @@ describe('GHFastForwardError retry', () => {
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(
 			new Map([['conflict.md', makeRemoteChange('conflict.md', 'modified')]]),
 		);
-		vi.mocked(classify).mockReturnValue([conflictPath]);
+		vi.mocked(classify).mockResolvedValue([conflictPath]);
 		vi.mocked(applyPush)
 			.mockRejectedValueOnce(new GHFastForwardError('ff'))
 			.mockResolvedValue({ newCommitSha: 'new-commit', updatedState });
@@ -791,7 +817,7 @@ describe('logging', () => {
 			new Map([['note.md', makeLocalChange('note.md', 'added')]]),
 		);
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(new Map());
-		vi.mocked(classify).mockReturnValue([pushPath]);
+		vi.mocked(classify).mockResolvedValue([pushPath]);
 		vi.mocked(applyPush).mockResolvedValue({ newCommitSha: 'new-commit', updatedState });
 
 		await engine.sync();
@@ -812,7 +838,7 @@ describe('logging', () => {
 			new Map([['note.md', makeLocalChange('note.md', 'added')]]),
 		);
 		vi.mocked(buildRemoteChangeSet).mockResolvedValue(new Map());
-		vi.mocked(classify).mockReturnValue([pushPath]);
+		vi.mocked(classify).mockResolvedValue([pushPath]);
 		vi.mocked(applyPush).mockResolvedValue({ newCommitSha: 'new-commit', updatedState });
 
 		await engine.sync();

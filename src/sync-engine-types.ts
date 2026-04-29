@@ -18,7 +18,7 @@ export interface RemoteChange {
 	isBinary: boolean;
 }
 
-export type ClassifyAction = 'pull' | 'push' | 'conflict' | 'no-op';
+export type ClassifyAction = 'pull' | 'push' | 'conflict' | 'no-op' | 'state-refresh';
 
 export interface ClassifiedPath {
 	path: string;

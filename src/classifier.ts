@@ -1,5 +1,6 @@
 import type { LocalChange, RemoteChange, LocalChangeType, RemoteChangeType, ClassifyAction, ClassifiedPath } from './sync-engine-types';
 import type { SyncState } from './state-store';
+import { gitBlobSha1 } from './hash';
 
 // Intentionally sync — classify() is pure with no I/O. Callers using the async
 // Logger from state-store.ts need to wrap it (e.g. (e, d) => void logger.warn(e, d)).
@@ -7,19 +8,30 @@ export interface ClassifierLogger {
 	warn(event: string, data?: Record<string, unknown>): void;
 }
 
-export function classify(
+export async function classify(
 	localChanges: Map<string, LocalChange>,
 	remoteChanges: Map<string, RemoteChange>,
-	_state: SyncState, // reserved — staleness comparison (§4.4) is deferred to the pull phase
+	_state: SyncState,
 	logger?: ClassifierLogger,
-): ClassifiedPath[] {
+): Promise<ClassifiedPath[]> {
 	const allPaths = new Set([...localChanges.keys(), ...remoteChanges.keys()]);
 	const result: ClassifiedPath[] = [];
 
 	for (const path of allPaths) {
-		const localType: LocalChangeType = localChanges.get(path)?.type ?? 'unchanged';
-		const remoteType: RemoteChangeType = remoteChanges.get(path)?.type ?? 'unchanged';
-		const action = resolveAction(localType, remoteType, path, logger);
+		const localChange = localChanges.get(path);
+		const remoteChange = remoteChanges.get(path);
+		const localType: LocalChangeType = localChange?.type ?? 'unchanged';
+		const remoteType: RemoteChangeType = remoteChange?.type ?? 'unchanged';
+		let action = resolveAction(localType, remoteType, path, logger);
+
+		// §4.4 staleness: both sides differ from state but local content matches remote
+		if (action === 'conflict' && localChange?.bytes && remoteChange?.blobSha) {
+			const localBlobSha = await gitBlobSha1(localChange.bytes);
+			if (localBlobSha === remoteChange.blobSha) {
+				action = 'state-refresh';
+			}
+		}
+
 		result.push({ path, action, local: localType, remote: remoteType });
 	}
 

@@ -1,5 +1,6 @@
 import { describe, test, expect, vi } from 'vitest';
 import { classify } from '../src/classifier';
+import { gitBlobSha1, sha256 } from '../src/hash';
 import type { LocalChange, RemoteChange } from '../src/sync-engine-types';
 import type { SyncState } from '../src/state-store';
 
@@ -23,116 +24,123 @@ function makeLogger() {
 	return { warn: vi.fn<[string, (Record<string, unknown> | undefined)?], void>() };
 }
 
+async function makeStalenessFixture() {
+	const bytes = new TextEncoder().encode('same content on both sides').buffer as ArrayBuffer;
+	const blobSha = await gitBlobSha1(bytes);
+	const contentHash = await sha256(bytes);
+	return { bytes, blobSha, contentHash, size: bytes.byteLength };
+}
+
 const EMPTY = new Map<string, LocalChange>();
 const EMPTY_REMOTE = new Map<string, RemoteChange>();
 
 // ─── Row: local=unchanged ───────────────────────────────────────────────────
 
-test('(unchanged, unchanged) — no-op (path in neither map, not returned)', () => {
+test('(unchanged, unchanged) — no-op (path in neither map, not returned)', async () => {
 	// A path in neither map is never included in the result
-	const result = classify(EMPTY, EMPTY_REMOTE, EMPTY_STATE);
+	const result = await classify(EMPTY, EMPTY_REMOTE, EMPTY_STATE);
 	expect(result).toHaveLength(0);
 });
 
-test('(unchanged, added) — pull', () => {
-	const result = classify(EMPTY, makeRemote('a.md', 'added'), EMPTY_STATE);
+test('(unchanged, added) — pull', async () => {
+	const result = await classify(EMPTY, makeRemote('a.md', 'added'), EMPTY_STATE);
 	expect(result).toHaveLength(1);
 	expect(result[0]).toMatchObject({ path: 'a.md', action: 'pull', local: 'unchanged', remote: 'added' });
 });
 
-test('(unchanged, modified) — pull', () => {
-	const result = classify(EMPTY, makeRemote('a.md', 'modified'), EMPTY_STATE);
+test('(unchanged, modified) — pull', async () => {
+	const result = await classify(EMPTY, makeRemote('a.md', 'modified'), EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'pull', local: 'unchanged', remote: 'modified' });
 });
 
-test('(unchanged, deleted) — pull', () => {
-	const result = classify(EMPTY, makeRemote('a.md', 'deleted'), EMPTY_STATE);
+test('(unchanged, deleted) — pull', async () => {
+	const result = await classify(EMPTY, makeRemote('a.md', 'deleted'), EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'pull', local: 'unchanged', remote: 'deleted' });
 });
 
 // ─── Row: local=added ────────────────────────────────────────────────────────
 
-test('(added, unchanged) — push', () => {
-	const result = classify(makeLocal('a.md', 'added'), EMPTY_REMOTE, EMPTY_STATE);
+test('(added, unchanged) — push', async () => {
+	const result = await classify(makeLocal('a.md', 'added'), EMPTY_REMOTE, EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'push', local: 'added', remote: 'unchanged' });
 });
 
-test('(added, added) — conflict (hash comparison deferred to pull phase)', () => {
-	const result = classify(makeLocal('a.md', 'added', 'hash-x'), makeRemote('a.md', 'added', 'blobsha-x'), EMPTY_STATE);
+test('(added, added) — conflict when no bytes available for staleness check', async () => {
+	// makeLocal omits bytes; staleness check is skipped → conflict
+	const result = await classify(makeLocal('a.md', 'added', 'hash-x'), makeRemote('a.md', 'added', 'blobsha-x'), EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'conflict', local: 'added', remote: 'added' });
 });
 
-test('(added, added) always conflict — sha256 vs git blob sha1 cannot be compared without I/O', () => {
-	// Hash comparison (same-content escape) is deferred to the pull phase; classifier has no I/O
-	const result = classify(makeLocal('a.md', 'added', 'hash-a'), makeRemote('a.md', 'added', 'hash-b'), EMPTY_STATE);
+test('(added, added) — conflict when bytes present but hashes differ', async () => {
+	const result = await classify(makeLocal('a.md', 'added', 'hash-a'), makeRemote('a.md', 'added', 'hash-b'), EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'conflict' });
 });
 
-test('(added, modified) — impossible: logs warning and returns no-op', () => {
+test('(added, modified) — impossible: logs warning and returns no-op', async () => {
 	const logger = makeLogger();
-	const result = classify(makeLocal('a.md', 'added'), makeRemote('a.md', 'modified'), EMPTY_STATE, logger);
+	const result = await classify(makeLocal('a.md', 'added'), makeRemote('a.md', 'modified'), EMPTY_STATE, logger);
 	expect(result[0]).toMatchObject({ action: 'no-op', local: 'added', remote: 'modified' });
 	expect(logger.warn).toHaveBeenCalledWith('classifier:impossible-cell', expect.objectContaining({ path: 'a.md' }));
 });
 
-test('(added, deleted) — impossible: logs warning and returns no-op', () => {
+test('(added, deleted) — impossible: logs warning and returns no-op', async () => {
 	const logger = makeLogger();
-	const result = classify(makeLocal('a.md', 'added'), makeRemote('a.md', 'deleted'), EMPTY_STATE, logger);
+	const result = await classify(makeLocal('a.md', 'added'), makeRemote('a.md', 'deleted'), EMPTY_STATE, logger);
 	expect(result[0]).toMatchObject({ action: 'no-op', local: 'added', remote: 'deleted' });
 	expect(logger.warn).toHaveBeenCalledWith('classifier:impossible-cell', expect.objectContaining({ path: 'a.md' }));
 });
 
 // ─── Row: local=modified ─────────────────────────────────────────────────────
 
-test('(modified, unchanged) — push', () => {
-	const result = classify(makeLocal('a.md', 'modified'), EMPTY_REMOTE, EMPTY_STATE);
+test('(modified, unchanged) — push', async () => {
+	const result = await classify(makeLocal('a.md', 'modified'), EMPTY_REMOTE, EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'push', local: 'modified', remote: 'unchanged' });
 });
 
-test('(modified, added) — impossible: logs warning and returns no-op', () => {
+test('(modified, added) — impossible: logs warning and returns no-op', async () => {
 	const logger = makeLogger();
-	const result = classify(makeLocal('a.md', 'modified'), makeRemote('a.md', 'added'), EMPTY_STATE, logger);
+	const result = await classify(makeLocal('a.md', 'modified'), makeRemote('a.md', 'added'), EMPTY_STATE, logger);
 	expect(result[0]).toMatchObject({ action: 'no-op', local: 'modified', remote: 'added' });
 	expect(logger.warn).toHaveBeenCalledWith('classifier:impossible-cell', expect.objectContaining({ path: 'a.md' }));
 });
 
-test('(modified, modified) — conflict', () => {
-	const result = classify(makeLocal('a.md', 'modified'), makeRemote('a.md', 'modified'), EMPTY_STATE);
+test('(modified, modified) — conflict when no bytes available', async () => {
+	const result = await classify(makeLocal('a.md', 'modified'), makeRemote('a.md', 'modified'), EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'conflict', local: 'modified', remote: 'modified' });
 });
 
-test('(modified, deleted) — conflict', () => {
-	const result = classify(makeLocal('a.md', 'modified'), makeRemote('a.md', 'deleted'), EMPTY_STATE);
+test('(modified, deleted) — conflict', async () => {
+	const result = await classify(makeLocal('a.md', 'modified'), makeRemote('a.md', 'deleted'), EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'conflict', local: 'modified', remote: 'deleted' });
 });
 
 // ─── Row: local=deleted ──────────────────────────────────────────────────────
 
-test('(deleted, unchanged) — push', () => {
-	const result = classify(makeLocal('a.md', 'deleted'), EMPTY_REMOTE, EMPTY_STATE);
+test('(deleted, unchanged) — push', async () => {
+	const result = await classify(makeLocal('a.md', 'deleted'), EMPTY_REMOTE, EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'push', local: 'deleted', remote: 'unchanged' });
 });
 
-test('(deleted, added) — impossible: logs warning and returns no-op', () => {
+test('(deleted, added) — impossible: logs warning and returns no-op', async () => {
 	const logger = makeLogger();
-	const result = classify(makeLocal('a.md', 'deleted'), makeRemote('a.md', 'added'), EMPTY_STATE, logger);
+	const result = await classify(makeLocal('a.md', 'deleted'), makeRemote('a.md', 'added'), EMPTY_STATE, logger);
 	expect(result[0]).toMatchObject({ action: 'no-op', local: 'deleted', remote: 'added' });
 	expect(logger.warn).toHaveBeenCalledWith('classifier:impossible-cell', expect.objectContaining({ path: 'a.md' }));
 });
 
-test('(deleted, modified) — conflict', () => {
-	const result = classify(makeLocal('a.md', 'deleted'), makeRemote('a.md', 'modified'), EMPTY_STATE);
+test('(deleted, modified) — conflict', async () => {
+	const result = await classify(makeLocal('a.md', 'deleted'), makeRemote('a.md', 'modified'), EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'conflict', local: 'deleted', remote: 'modified' });
 });
 
-test('(deleted, deleted) — no-op', () => {
-	const result = classify(makeLocal('a.md', 'deleted'), makeRemote('a.md', 'deleted'), EMPTY_STATE);
+test('(deleted, deleted) — no-op', async () => {
+	const result = await classify(makeLocal('a.md', 'deleted'), makeRemote('a.md', 'deleted'), EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'no-op', local: 'deleted', remote: 'deleted' });
 });
 
 // ─── Multiple paths ───────────────────────────────────────────────────────────
 
-test('multiple paths are each classified independently', () => {
+test('multiple paths are each classified independently', async () => {
 	const localChanges: Map<string, LocalChange> = new Map([
 		['added.md', { path: 'added.md', type: 'added', contentHash: 'h1', size: 5, isBinary: false }],
 		['modified.md', { path: 'modified.md', type: 'modified', contentHash: 'h2', size: 5, isBinary: false }],
@@ -141,7 +149,7 @@ test('multiple paths are each classified independently', () => {
 		['remote-added.md', { path: 'remote-added.md', type: 'added', blobSha: 'b1', size: 5, isBinary: false }],
 	]);
 
-	const result = classify(localChanges, remoteChanges, EMPTY_STATE);
+	const result = await classify(localChanges, remoteChanges, EMPTY_STATE);
 	expect(result).toHaveLength(3);
 
 	const byPath = Object.fromEntries(result.map(r => [r.path, r]));
@@ -150,7 +158,54 @@ test('multiple paths are each classified independently', () => {
 	expect(byPath['remote-added.md'].action).toBe('pull');
 });
 
-test('no logger provided for impossible cell: still returns no-op without throwing', () => {
-	const result = classify(makeLocal('a.md', 'added'), makeRemote('a.md', 'modified'), EMPTY_STATE);
+test('no logger provided for impossible cell: still returns no-op without throwing', async () => {
+	const result = await classify(makeLocal('a.md', 'added'), makeRemote('a.md', 'modified'), EMPTY_STATE);
 	expect(result[0].action).toBe('no-op');
+});
+
+// ─── §4.4 Staleness detection ─────────────────────────────────────────────────
+
+describe('§4.4 staleness', () => {
+	test('(modified, modified) — local bytes match remote blob → state-refresh', async () => {
+		const { bytes, blobSha, contentHash, size } = await makeStalenessFixture();
+		const localChanges = new Map([['a.md', { path: 'a.md', type: 'modified' as const, contentHash, bytes, size, isBinary: false }]]);
+		const remoteChanges = new Map([['a.md', { path: 'a.md', type: 'modified' as const, blobSha, size, isBinary: false }]]);
+
+		const result = await classify(localChanges, remoteChanges, EMPTY_STATE);
+
+		expect(result[0]).toMatchObject({ action: 'state-refresh', local: 'modified', remote: 'modified' });
+	});
+
+	test('(modified, modified) — content differs → conflict (regression)', async () => {
+		const bytes = new TextEncoder().encode('local version').buffer as ArrayBuffer;
+		const contentHash = await sha256(bytes);
+		const localChanges = new Map([['a.md', { path: 'a.md', type: 'modified' as const, contentHash, bytes, size: bytes.byteLength, isBinary: false }]]);
+		const remoteChanges = new Map([['a.md', { path: 'a.md', type: 'modified' as const, blobSha: 'different-blob-sha', size: 12, isBinary: false }]]);
+
+		const result = await classify(localChanges, remoteChanges, EMPTY_STATE);
+
+		expect(result[0]).toMatchObject({ action: 'conflict', local: 'modified', remote: 'modified' });
+	});
+
+	test('(added, added) — local bytes match remote blob → state-refresh', async () => {
+		const { bytes, blobSha, contentHash, size } = await makeStalenessFixture();
+		const localChanges = new Map([['a.md', { path: 'a.md', type: 'added' as const, contentHash, bytes, size, isBinary: false }]]);
+		const remoteChanges = new Map([['a.md', { path: 'a.md', type: 'added' as const, blobSha, size, isBinary: false }]]);
+
+		const result = await classify(localChanges, remoteChanges, EMPTY_STATE);
+
+		expect(result[0]).toMatchObject({ action: 'state-refresh', local: 'added', remote: 'added' });
+	});
+
+	test('(modified, deleted) — no staleness check (remote has no blobSha) → conflict', async () => {
+		const bytes = new TextEncoder().encode('content').buffer as ArrayBuffer;
+		const contentHash = await sha256(bytes);
+		const localChanges = new Map([['a.md', { path: 'a.md', type: 'modified' as const, contentHash, bytes, size: bytes.byteLength, isBinary: false }]]);
+		// remote=deleted: blobSha is undefined
+		const remoteChanges = new Map([['a.md', { path: 'a.md', type: 'deleted' as const, size: 0, isBinary: false }]]);
+
+		const result = await classify(localChanges, remoteChanges, EMPTY_STATE);
+
+		expect(result[0]).toMatchObject({ action: 'conflict', local: 'modified', remote: 'deleted' });
+	});
 });
