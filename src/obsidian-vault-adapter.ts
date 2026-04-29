@@ -39,6 +39,8 @@ export class ObsidianVaultAdapter implements VaultAdapter {
 		if (isTFile(file)) {
 			return this.app.vault.modify(file, content);
 		}
+		// vault.create fires Obsidian's file-created event for indexed paths.
+		// Dotfiles (.obsidian/...) aren't vault-managed, so create throws — fall back to adapter.
 		try {
 			await this.app.vault.create(path, content);
 		} catch {
@@ -51,6 +53,7 @@ export class ObsidianVaultAdapter implements VaultAdapter {
 		if (isTFile(file)) {
 			return this.app.vault.modifyBinary(file, content);
 		}
+		// Same dotfile fallback as writeText.
 		try {
 			await this.app.vault.createBinary(path, content);
 		} catch {
@@ -61,7 +64,7 @@ export class ObsidianVaultAdapter implements VaultAdapter {
 	async delete(path: string): Promise<void> {
 		const file = this.app.vault.getAbstractFileByPath(path);
 		if (isTFile(file)) {
-			return this.app.vault.delete(file);
+			return this.app.vault.delete(file, true);
 		}
 		return this.app.vault.adapter.remove(path);
 	}

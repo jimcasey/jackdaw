@@ -197,7 +197,7 @@ describe('ObsidianVaultAdapter', () => {
 			const app = makeApp({ 'notes/old.md': tf });
 			const adapter = new ObsidianVaultAdapter(app as unknown as App);
 			await adapter.delete('notes/old.md');
-			expect(app.vault.delete).toHaveBeenCalledWith(tf);
+			expect(app.vault.delete).toHaveBeenCalledWith(tf, true);
 			expect(app.vault.adapter.remove).not.toHaveBeenCalled();
 		});
 
