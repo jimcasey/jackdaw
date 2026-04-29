@@ -186,10 +186,16 @@ If `sync-state.json` does not exist, jump to §7 (mass-conflict flow). Do not pr
 
 ### 5.3 Build the local change set
 
+Before walking, build the exclusion filter:
+1. Start with the plugin's hard-excluded paths: `data.json`, `sync-state.json`, `sync.log` (all under `.obsidian/plugins/<our-id>/`).
+2. If a `.gitignore` file exists at the vault root, read it and parse its positive patterns (lines that are not blank, not comments, and do not begin with `!`) into the exclusion list. Negation lines (`!pattern`) are silently ignored for v1.
+3. Append user-configured exclude patterns from settings.
+
 Walk the vault:
 - `app.vault.getFiles()` for everything Obsidian indexes (markdown, canvases, attachments, etc.).
 - Adapter walk through `.obsidian` if and only if the user has opted into config sync, with hard exclusion of `.obsidian/plugins/<our-id>/`.
-- Apply user exclude patterns (glob-matched against vault-relative paths).
+- When descending directories via the adapter walk, **never descend into `.git/`** — skip it at the directory level, not the file level. This is a hard exclusion regardless of user settings (see ADR 002).
+- Apply the exclusion filter (glob-matched against vault-relative paths) to all candidate files.
 
 For each candidate file:
 - Read bytes. For text files, `vault.read(file)`. For binaries, `vault.readBinary(file)`. (Choice of API is determined by extension, not by guessing.)
