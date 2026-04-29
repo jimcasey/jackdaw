@@ -5,7 +5,7 @@ export interface LocalChange {
 	path: string;
 	type: LocalChangeType;
 	contentHash: string;
-	bytes: ArrayBuffer;
+	bytes?: ArrayBuffer;
 	size: number;
 	isBinary: boolean;
 }
@@ -13,7 +13,7 @@ export interface LocalChange {
 export interface RemoteChange {
 	path: string;
 	type: RemoteChangeType;
-	blobSha: string;
+	blobSha?: string;
 	size: number;
 	isBinary: boolean;
 }
