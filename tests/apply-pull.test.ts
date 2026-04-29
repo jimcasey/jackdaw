@@ -1,8 +1,7 @@
 import { describe, test, expect, vi, type Mock } from 'vitest';
 import { applyPull, type PullLogger } from '../src/apply-pull';
 import { SyncStateInconsistencyError } from '../src/sync-engine-types';
-import type { ClassifiedPath, VaultAdapter } from '../src/sync-engine-types';
-import type { RemoteChange } from '../src/sync-engine-types';
+import type { ClassifiedPath, VaultAdapter, RemoteChange } from '../src/sync-engine-types';
 import type { SyncState } from '../src/state-store';
 import type { Settings } from '../src/settings';
 import type { GitHubClient } from '../src/github-client';
@@ -52,18 +51,18 @@ function asVault(mock: MockVault): VaultAdapter {
 	return mock as unknown as VaultAdapter;
 }
 
+interface MockLogger {
+	debug: Mock;
+	warn: Mock;
+	error: Mock;
+}
+
 function makeLogger(): MockLogger & PullLogger {
 	return {
 		debug: vi.fn().mockResolvedValue(undefined),
 		warn: vi.fn().mockResolvedValue(undefined),
 		error: vi.fn().mockResolvedValue(undefined),
 	};
-}
-
-interface MockLogger {
-	debug: Mock;
-	warn: Mock;
-	error: Mock;
 }
 
 function makeState(overrides: Partial<SyncState> = {}): SyncState {
@@ -125,6 +124,7 @@ describe('applyPull', () => {
 		expect(client.getBlob).toHaveBeenCalledWith('test-owner', 'test-repo', blobSha);
 		expect(vault.writeText).toHaveBeenCalledWith(path, content);
 		expect(vault.writeBinary).not.toHaveBeenCalled();
+		expect(logger.debug).toHaveBeenCalledWith('sync.pull.file', { path, type: 'added' });
 
 		const expectedHash = await sha256(bytes);
 		expect(result.updatedState.files[path]).toEqual({
@@ -163,6 +163,7 @@ describe('applyPull', () => {
 		expect(client.getBlob).toHaveBeenCalledWith('test-owner', 'test-repo', blobSha);
 		expect(vault.writeBinary).toHaveBeenCalledWith(path, bytes);
 		expect(vault.writeText).not.toHaveBeenCalled();
+		expect(logger.debug).toHaveBeenCalledWith('sync.pull.file', { path, type: 'modified' });
 
 		const expectedHash = await sha256(bytes);
 		expect(result.updatedState.files[path]).toEqual({
@@ -204,6 +205,7 @@ describe('applyPull', () => {
 		expect(result.updatedState.files[path]).toBeUndefined();
 		expect(client.getBlob).not.toHaveBeenCalled();
 		expect(result.skipped).toEqual([]);
+		expect(logger.debug).toHaveBeenCalledWith('sync.pull.file', { path, type: 'deleted' });
 	});
 
 	test('remote-deleted with mismatched hash: throws SyncStateInconsistencyError', async () => {
@@ -245,7 +247,7 @@ describe('applyPull', () => {
 		const vault = makeVault();
 		const logger = makeLogger();
 		const state = makeState();
-		const settings = makeSettings({ perFileSizeLimitMb: 25 });
+		const settings = makeSettings();
 
 		const remote = new Map<string, RemoteChange>([
 			[path, { path, type: 'added', blobSha, size: sizeBytes, isBinary: true }],
@@ -259,5 +261,44 @@ describe('applyPull', () => {
 		expect(result.skipped).toEqual([path]);
 		expect(logger.warn).toHaveBeenCalled();
 		expect(result.updatedState.files[path]).toBeUndefined();
+	});
+
+	test('keep-remote conflict resolution: fetches and writes blob, updates state', async () => {
+		const path = 'notes/conflict.md';
+		const blobSha = 'blob-sha-conflict';
+		const content = 'Remote wins';
+		const bytes = toBytes(content);
+
+		const client = makeClient();
+		client.getBlob.mockResolvedValue(bytes);
+		const vault = makeVault();
+		const logger = makeLogger();
+		const state = makeState({
+			files: {
+				[path]: { path, blobSha: 'old-blob', contentHash: 'old-hash', size: 50, isBinary: false },
+			},
+		});
+		const settings = makeSettings();
+
+		const remote = new Map<string, RemoteChange>([
+			[path, { path, type: 'modified', blobSha, size: bytes.byteLength, isBinary: false }],
+		]);
+		// action is 'conflict' but caller resolved it as keep-remote, so it's in the paths list
+		const paths = [makeClassified(path, 'conflict', 'modified', 'modified')];
+
+		const result = await applyPull(paths, remote, asClient(client), asVault(vault), state, settings, logger);
+
+		expect(client.getBlob).toHaveBeenCalledWith('test-owner', 'test-repo', blobSha);
+		expect(vault.writeText).toHaveBeenCalledWith(path, content);
+
+		const expectedHash = await sha256(bytes);
+		expect(result.updatedState.files[path]).toEqual({
+			path,
+			blobSha,
+			contentHash: expectedHash,
+			size: bytes.byteLength,
+			isBinary: false,
+		});
+		expect(result.skipped).toEqual([]);
 	});
 });

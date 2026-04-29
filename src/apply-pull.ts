@@ -1,10 +1,11 @@
-import type { ClassifiedPath, VaultAdapter } from './sync-engine-types';
-import type { RemoteChange } from './sync-engine-types';
+import type { ClassifiedPath, VaultAdapter, RemoteChange } from './sync-engine-types';
 import type { SyncState, SyncedFileRecord } from './state-store';
 import type { Settings } from './settings';
 import type { GitHubClient } from './github-client';
 import { SyncStateInconsistencyError } from './sync-engine-types';
 import { sha256 } from './hash';
+
+const decoder = new TextDecoder();
 
 export interface PullLogger {
 	debug(event: string, data?: Record<string, unknown>): Promise<void>;
@@ -41,7 +42,7 @@ export async function applyPull(
 			if (remoteChange.isBinary) {
 				await vault.writeBinary(path, bytes);
 			} else {
-				await vault.writeText(path, new TextDecoder().decode(bytes));
+				await vault.writeText(path, decoder.decode(bytes));
 			}
 
 			const contentHash = await sha256(bytes);
