@@ -80,6 +80,15 @@ export class SyncNeedsUIError extends Error {
 	}
 }
 
+export class SyncStateInconsistencyError extends Error {
+	override readonly name = 'SyncStateInconsistencyError';
+	readonly path: string;
+	constructor(path: string) {
+		super(`Hash mismatch on remote-deleted path '${path}': local file modified outside of sync.`);
+		this.path = path;
+	}
+}
+
 export class PolicyBasedResolver implements ConflictResolver, FirstSyncResolver {
 	constructor(private readonly policy: 'always-prefer-local' | 'always-prefer-remote' | 'always-ask') {}
 
