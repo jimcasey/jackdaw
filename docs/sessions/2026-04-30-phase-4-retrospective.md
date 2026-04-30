@@ -89,7 +89,7 @@ All four implementation issues shipped. The table below summarises each module, 
 
 **What shipped (#98, #99):** A seventh error class, `GHEmptyRepoError`, is thrown from the `request()` 409 path and from a probe inside `getBranch()` that distinguishes empty-repo from missing-repo/branch when the initial `branches/<name>` returns 404. `sync-notice.ts` and the settings-tab "Test connection" handler both surface it with a friendlier message.
 
-**Resolution:** This came up in Phase 4 when the first-sync modal would otherwise hit a generic 404 against a freshly-created repo with no commits. CLAUDE.md should add `GHEmptyRepoError` to the seven-class list under `src/github-client.ts`; deferred to next editing pass.
+**Resolution:** This came up in Phase 4 when the first-sync modal would otherwise hit a generic 404 against a freshly-created repo with no commits. CLAUDE.md is updated in this retro PR to list `GHEmptyRepoError` alongside the other six classes under `src/github-client.ts`. A spec amendment to §6 is deferred to the next editing pass.
 
 ### 2.8 `state-store.ts` pre-removes canonical before rename
 
@@ -128,6 +128,10 @@ All four implementation issues shipped. The table below summarises each module, 
 | Item | Deferred to | Notes |
 |---|---|---|
 | Integration tests against real GitHub (§11.2) | Phase 5 | Requires CI-owned GitHub account and per-run fresh branches; biggest hole in current coverage |
+| Desktop end-to-end smoke: `always-ask` conflict resolved via modal | Phase 5 / manual | Per #85 checklist; not verified in this retro PR |
+| Desktop end-to-end smoke: first-sync against populated repo + populated vault via modal | Phase 5 / manual | Per #85 checklist; not verified in this retro PR |
+| Mobile-width usability check: 5 conflicts resolvable on a phone-width screen | Phase 5 / manual | Per #85 checklist + spec §15; not verified in this retro PR |
+| PAT-absent regression check on `sync.log` after a conflict-resolution sync | Phase 5 / manual | Per #85 checklist; not verified in this retro PR |
 | iOS manual smoke test (§11.3) | Phase 5 / manual | Single most important derisking step before BRAT release |
 | Obsidian Sync coexistence test (§4.4 staleness path) | Phase 5 | Classifier emits `state-refresh`; needs an end-to-end test with two devices |
 | README + screenshots | Phase 5 | Required for BRAT discoverability |
@@ -145,6 +149,8 @@ All four implementation issues shipped. The table below summarises each module, 
 
 ## 5. Phase 5 readiness
 
-**Confirmed.** All Phase 4 issues (#81–#84) are closed. Quality gates pass: 271 tests green, lint clean, typecheck clean. The plugin runs an end-to-end `always-ask` conflict-resolution sync via the modal. The first-sync modal is wired and reachable on first sync against a populated repo. The `SyncNeedsUIError` placeholder error toast has been removed from `main.ts` / `sync-notice.ts` (replaced by the modal path).
+**Code-level: confirmed.** All Phase 4 issues (#81–#84) are closed. Quality gates pass: 271 tests green, lint clean, typecheck clean. `main.ts` constructs `ConflictResolutionModal` and `FirstSyncModal`, wraps them in `PolicyAware*` resolvers, and injects them into `SyncEngine`. The `SyncNeedsUIError` placeholder error toast has been removed from `main.ts` / `sync-notice.ts` (replaced by the modal path).
 
-Phase 5 scope: integration tests, iOS manual testing, README + screenshots, BRAT release. No engine, classifier, GitHub-client, or modal changes anticipated.
+**Manual gates: not yet performed.** The four manual checks from #85's checklist — desktop end-to-end `always-ask` smoke, first-sync against a populated repo/vault, mobile-width usability, and PAT-absent log regression — are deferred to Phase 5 / manual (see §4). The retro records that the modal seam is wired and reachable in code but does not assert that the integrated UX has been observed.
+
+Phase 5 scope: integration tests, the manual gates above, iOS manual testing, README + screenshots, BRAT release. No engine, classifier, GitHub-client, or modal changes anticipated.
