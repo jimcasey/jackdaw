@@ -12,7 +12,7 @@ The full design specification is at `docs/design-specification.md` and is the au
 
 ## Project status
 
-Phase 0 (scaffold) is complete. Phase 1 (core libs) is complete. Phase 2 (sync engine) is complete. Phase 3 (UI) is complete. Phase 4 (first-sync + conflicts) is next.
+Phase 0 (scaffold) is complete. Phase 1 (core libs) is complete. Phase 2 (sync engine) is complete. Phase 3 (UI) is complete. Phase 4 (UI conflicts) is complete. Phase 5 (BRAT release) is next.
 
 ## Build commands
 
@@ -55,13 +55,13 @@ If the session opens with a message that is solely an issue number (e.g. `#40` o
 
 Core modules (see §3 of the design spec for the ASCII diagram):
 
-- **`src/github-client.ts`** — Thin wrapper around Obsidian's `requestUrl`. Handles auth, rate-limit headers, exponential backoff on 429/5xx, base64 encode/decode (`encodeBase64Chunked`). Exports six typed error classes (`GHAuthError`, `GHNotFoundError`, `GHRateLimitError`, `GHFastForwardError`, `GHNetworkError`, `GHServerError`). No Octokit. Must use `requestUrl`, not `fetch` — `fetch` fails CORS in the renderer.
+- **`src/github-client.ts`** — Thin wrapper around Obsidian's `requestUrl`. Handles auth, rate-limit headers, exponential backoff on 429/5xx, base64 encode/decode (`encodeBase64Chunked`). Exports seven typed error classes (`GHAuthError`, `GHNotFoundError`, `GHEmptyRepoError`, `GHRateLimitError`, `GHFastForwardError`, `GHNetworkError`, `GHServerError`). `getBranch()` probes `git/refs/heads` to distinguish empty-repo from missing-repo on 404. No Octokit. Must use `requestUrl`, not `fetch` — `fetch` fails CORS in the renderer.
 - **`src/state-store.ts`** — Owns `sync-state.json` (paths → SHA-256 hashes + blob SHAs + last commit SHA). Atomic writes via temp-file-and-rename. Uses a `StateAdapter` interface (not `DataAdapter` directly) for testability. This is the plugin's own index, not git's index.
 - **`src/hash.ts`** — `sha256(bytes)` and `gitBlobSha1(bytes)` utilities. Both use `crypto.subtle.digest`. `gitBlobSha1` is used at first-sync to identify identical files without downloading them.
 - **`src/logger.ts`** — JSONL log to `.obsidian/plugins/<id>/sync.log`. Never logs PAT or file contents. Rotates at 1 MB. PAT scrubbed from all log lines via string replacement and a header regex.
 - **`src/settings.ts`** — `Settings` interface and `DEFAULT_SETTINGS` constant. Covers PAT, repo, conflict policy, per-file size limit, device name, include-obsidian-config, exclude patterns, verbose logging.
 - **`src/constants.ts`** — `PLUGIN_ID`, `SELF_EXCLUDED_PATHS` (hard-excludes `data.json`, `sync-state.json`, `.tmp`, `sync.log`, `.log.1`), and `BINARY_EXTENSIONS` set.
-- **`src/sync-engine-types.ts`** — Shared type contract for the sync engine. `LocalChange`, `RemoteChange`, `ClassifiedPath` (action: `'pull' | 'push' | 'conflict' | 'no-op' | 'state-refresh'`), `VaultAdapter`, `ConflictResolver`, `FirstSyncResolver`, `PolicyBasedResolver`, `PolicyAwareConflictResolver`, `PolicyAwareFirstSyncResolver`, `SyncNeedsUIError`, `SyncStateInconsistencyError`. The `PolicyAware*` wrappers branch between modal and `PolicyBasedResolver` based on the live `conflictPolicy` setting; injected by `main.ts` so `SyncEngine` is policy-agnostic.
+- **`src/sync-engine-types.ts`** — Shared type contract for the sync engine. `LocalChange`, `RemoteChange`, `ClassifiedPath` (action: `'pull' | 'push' | 'conflict' | 'no-op' | 'state-refresh'`), `ConflictItem` (extends `ClassifiedPath` with `isBinary`, `localSize`, `remoteSize`, `remoteBlobSha` so resolvers can render diffs without re-querying the engine), `VaultAdapter`, `ConflictResolver`, `FirstSyncResolver`, `PolicyBasedResolver`, `PolicyAwareConflictResolver`, `PolicyAwareFirstSyncResolver`, `SyncNeedsUIError`, `SyncStateInconsistencyError`. The `PolicyAware*` wrappers branch between modal and `PolicyBasedResolver` based on the live `conflictPolicy` setting; injected by `main.ts` so `SyncEngine` is policy-agnostic and always calls `this.conflicts.resolve()`.
 - **`src/classifier.ts`** — Pure `classify()` function; full §5.5 4×4 matrix; §4.4 staleness detection (emits `'state-refresh'` when local blob SHA matches remote despite state mismatch).
 - **`src/file-scanner.ts`** — `FileScanner`; `.gitignore` parse + glob compiler; `.git/` directory-level hard-exclusion.
 - **`src/local-change-set.ts`** — `buildLocalChangeSet()`; delegates to `FileScanner`; computes SHA-256; identifies deletions from state.
@@ -73,9 +73,14 @@ Core modules (see §3 of the design spec for the ASCII diagram):
 - **`src/sync-notice.ts`** — `formatSyncOutcome()`; maps `SyncResult` to `{ toasts, statusBar }` for `main.ts` to act on. Keeps notice logic testable without Obsidian dependency.
 - **`src/obsidian-vault-adapter.ts`** — Production `VaultAdapter`; bridges sync engine to `app.vault` / `app.vault.adapter`. Uses duck-typed `isTFile()` guard (not `instanceof`) to stay testable in pure Node.
 - **`src/obsidian-state-adapter.ts`** — Production `StateAdapter`; thin passthrough to `app.vault.adapter` for `StateStore`.
-- **`src/ui/settings-tab.ts`** — `JackdawSettingsTab`; Connection, Sync behavior, Inclusion, Diagnostics sections; `SyncLogModal`; `ResetSyncStateModal`.
+- **`src/ui/settings-tab.ts`** — `JackdawSettingsTab`; Connection, Sync behavior, Inclusion, Diagnostics sections; `SyncLogModal` (with Copy button + log path hint); `ResetSyncStateModal`.
 - **`src/ui/ribbon.ts`** — `RibbonIcon`; `setSyncing()` / `setIdle()` CSS class toggle on the ribbon element.
 - **`src/ui/status-bar.ts`** — `StatusBar`; `setIdle()`, `setSyncing()`, `setError()`; desktop-only.
+- **`src/ui/diff.ts`** — `computeLineDiff()` wraps the `diff` npm package's `diffLines`. Returns `DiffLine[]` (`{ kind: 'context'|'add'|'remove', text, localLineNumber?, remoteLineNumber? }`) so the row renderer stays a dumb function of structured data. Pure Node, no DOM.
+- **`src/ui/modals/conflict-row.ts`** — `createConflictRow()` factory returning `{ el, setResolution, setExpanded, setContent }`. Same row component is used by both modals. Content has four states: `loading`, `error`, `binary` (renders byte-count summary per §8.3), `text` (renders `DiffLine[]`).
+- **`src/ui/modals/virtualized-list.ts`** — Pure `computeVirtualWindow()` taking `{scrollTop, viewportHeight, itemCount, getItemHeight, overscan}` and returning `{startIndex, endIndex, totalHeight, offsetY}`. Variable-height rows via `getItemHeight`; default overscan = 3.
+- **`src/ui/modals/conflict-resolution-modal.ts`** — `ConflictResolutionModal extends Modal implements ConflictResolver`. Rows are collapsed by default; expanding triggers lazy `getBlob()` + local read + `computeLineDiff()`. In-modal `Map<path, ContentState>` cache survives unmount when rows scroll out. `Apply` disabled until every conflict has a resolution.
+- **`src/ui/modals/first-sync-modal.ts`** — `FirstSyncModal extends Modal implements FirstSyncResolver`. Same row + virtualized-list components as the conflict modal, plus a summary block (counts of local-only / remote-only / identical / conflicts) and a confirmation checkbox per §8.4. `Apply` disabled until checkbox is checked **and** every conflict resolved.
 - **`src/main.ts`** — `JackdawPlugin` entry point. Instantiates and wires all components. Wraps `ConflictResolutionModal` and `FirstSyncModal` in `PolicyAwareConflictResolver` / `PolicyAwareFirstSyncResolver` so the live `conflictPolicy` setting decides between modal UI and `PolicyBasedResolver` on each sync. `runSync()` with `isRunningSync` guard. `handleSyncResult()` delegates to `sync-notice.ts`. Android short-circuit.
 
 ## Key design constraints
