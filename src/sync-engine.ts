@@ -18,7 +18,6 @@ import type {
 	ConflictItem,
 	ConflictResolution,
 } from './sync-engine-types';
-import { PolicyBasedResolver } from './sync-engine-types';
 
 const MAX_FF_RETRIES = 2;
 
@@ -87,7 +86,6 @@ export class SyncEngine {
 	): Promise<SyncResult> {
 		const { owner, repo, branch } = settings;
 		let fastForwardRetries = 0;
-		const policyResolver = new PolicyBasedResolver(() => settings.conflictPolicy);
 
 		const report: SyncReport = {
 			filesAdded: 0,
@@ -157,15 +155,11 @@ export class SyncEngine {
 			let conflictResolutions = new Map<string, ConflictResolution>();
 
 			if (conflictItems.length > 0) {
-				if (settings.conflictPolicy !== 'always-ask') {
-					conflictResolutions = (await policyResolver.resolve(conflictItems)) as Map<string, ConflictResolution>;
-				} else {
-					const result = await this.conflicts.resolve(conflictItems);
-					if (result === 'cancel') {
-						return { status: 'cancelled' };
-					}
-					conflictResolutions = result;
+				const result = await this.conflicts.resolve(conflictItems);
+				if (result === 'cancel') {
+					return { status: 'cancelled' };
 				}
+				conflictResolutions = result;
 				report.conflictsResolved = conflictResolutions.size;
 			}
 

@@ -61,7 +61,7 @@ Core modules (see §3 of the design spec for the ASCII diagram):
 - **`src/logger.ts`** — JSONL log to `.obsidian/plugins/<id>/sync.log`. Never logs PAT or file contents. Rotates at 1 MB. PAT scrubbed from all log lines via string replacement and a header regex.
 - **`src/settings.ts`** — `Settings` interface and `DEFAULT_SETTINGS` constant. Covers PAT, repo, conflict policy, per-file size limit, device name, include-obsidian-config, exclude patterns, verbose logging.
 - **`src/constants.ts`** — `PLUGIN_ID`, `SELF_EXCLUDED_PATHS` (hard-excludes `data.json`, `sync-state.json`, `.tmp`, `sync.log`, `.log.1`), and `BINARY_EXTENSIONS` set.
-- **`src/sync-engine-types.ts`** — Shared type contract for the sync engine. `LocalChange`, `RemoteChange`, `ClassifiedPath` (action: `'pull' | 'push' | 'conflict' | 'no-op' | 'state-refresh'`), `VaultAdapter`, `ConflictResolver`, `FirstSyncResolver`, `PolicyBasedResolver`, `SyncNeedsUIError`, `SyncStateInconsistencyError`.
+- **`src/sync-engine-types.ts`** — Shared type contract for the sync engine. `LocalChange`, `RemoteChange`, `ClassifiedPath` (action: `'pull' | 'push' | 'conflict' | 'no-op' | 'state-refresh'`), `VaultAdapter`, `ConflictResolver`, `FirstSyncResolver`, `PolicyBasedResolver`, `PolicyAwareConflictResolver`, `PolicyAwareFirstSyncResolver`, `SyncNeedsUIError`, `SyncStateInconsistencyError`. The `PolicyAware*` wrappers branch between modal and `PolicyBasedResolver` based on the live `conflictPolicy` setting; injected by `main.ts` so `SyncEngine` is policy-agnostic.
 - **`src/classifier.ts`** — Pure `classify()` function; full §5.5 4×4 matrix; §4.4 staleness detection (emits `'state-refresh'` when local blob SHA matches remote despite state mismatch).
 - **`src/file-scanner.ts`** — `FileScanner`; `.gitignore` parse + glob compiler; `.git/` directory-level hard-exclusion.
 - **`src/local-change-set.ts`** — `buildLocalChangeSet()`; delegates to `FileScanner`; computes SHA-256; identifies deletions from state.
@@ -76,7 +76,7 @@ Core modules (see §3 of the design spec for the ASCII diagram):
 - **`src/ui/settings-tab.ts`** — `JackdawSettingsTab`; Connection, Sync behavior, Inclusion, Diagnostics sections; `SyncLogModal`; `ResetSyncStateModal`.
 - **`src/ui/ribbon.ts`** — `RibbonIcon`; `setSyncing()` / `setIdle()` CSS class toggle on the ribbon element.
 - **`src/ui/status-bar.ts`** — `StatusBar`; `setIdle()`, `setSyncing()`, `setError()`; desktop-only.
-- **`src/main.ts`** — `JackdawPlugin` entry point. Instantiates and wires all components. `runSync()` with `isRunningSync` guard. `handleSyncResult()` delegates to `sync-notice.ts`. Android short-circuit. *(Conflict resolution modal and first-sync modal injected here in Phase 4.)*
+- **`src/main.ts`** — `JackdawPlugin` entry point. Instantiates and wires all components. Wraps `ConflictResolutionModal` and `FirstSyncModal` in `PolicyAwareConflictResolver` / `PolicyAwareFirstSyncResolver` so the live `conflictPolicy` setting decides between modal UI and `PolicyBasedResolver` on each sync. `runSync()` with `isRunningSync` guard. `handleSyncResult()` delegates to `sync-notice.ts`. Android short-circuit.
 
 ## Key design constraints
 

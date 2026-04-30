@@ -121,3 +121,33 @@ export class PolicyBasedResolver implements ConflictResolver, FirstSyncResolver 
 		return Promise.resolve(result);
 	}
 }
+
+export class PolicyAwareConflictResolver implements ConflictResolver {
+	constructor(
+		private readonly getPolicy: () => ConflictPolicy,
+		private readonly modal: ConflictResolver,
+	) {}
+
+	resolve(conflicts: ConflictItem[]): Promise<Map<string, ConflictResolution> | 'cancel'> {
+		const policy = this.getPolicy();
+		if (policy === 'always-ask') {
+			return this.modal.resolve(conflicts);
+		}
+		return new PolicyBasedResolver(() => policy).resolve(conflicts);
+	}
+}
+
+export class PolicyAwareFirstSyncResolver implements FirstSyncResolver {
+	constructor(
+		private readonly getPolicy: () => ConflictPolicy,
+		private readonly modal: FirstSyncResolver,
+	) {}
+
+	resolve(summary: FirstSyncSummary): Promise<Map<string, ConflictResolution> | 'cancel'> {
+		const policy = this.getPolicy();
+		if (policy === 'always-ask') {
+			return this.modal.resolve(summary);
+		}
+		return new PolicyBasedResolver(() => policy).resolve(summary);
+	}
+}

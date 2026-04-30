@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'vitest';
 import { formatSyncOutcome } from '../src/sync-notice';
-import { SyncNeedsUIError } from '../src/sync-engine-types';
 import type { SyncReport, SyncResult } from '../src/sync-engine-types';
 
 const NOW = '2026-04-30T12:00:00.000Z';
@@ -90,19 +89,6 @@ describe('formatSyncOutcome', () => {
 	test('cancelled with no last known sync time leaves status bar in never-synced state', () => {
 		const outcome = formatSyncOutcome({ status: 'cancelled' }, now, null);
 		expect(outcome.statusBar).toEqual({ kind: 'idle', lastSyncAt: null });
-	});
-
-	test('SyncNeedsUIError produces dedicated message and dedicated status bar text', () => {
-		const result: SyncResult = { status: 'error', error: new SyncNeedsUIError() };
-		const outcome = formatSyncOutcome(result, now, null);
-
-		expect(outcome.toasts).toEqual([
-			"Conflict resolution UI is not yet available. Choose 'Prefer local' or 'Prefer remote' in settings, or wait for the next release.",
-		]);
-		expect(outcome.statusBar).toEqual({
-			kind: 'error',
-			message: 'Conflict — set conflict policy',
-		});
 	});
 
 	test('GHEmptyRepoError produces actionable message and short status bar text', () => {
