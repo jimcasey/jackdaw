@@ -11,10 +11,10 @@ import { ObsidianStateAdapter } from './obsidian-state-adapter';
 import { StateStore } from './state-store';
 import { ObsidianVaultAdapter } from './obsidian-vault-adapter';
 import { SyncEngine } from './sync-engine';
-import type { SyncResult } from './sync-engine-types';
 import {
 	PolicyAwareConflictResolver,
 	PolicyAwareFirstSyncResolver,
+	type SyncResult,
 } from './sync-engine-types';
 import { formatSyncOutcome } from './sync-notice';
 
