@@ -1,13 +1,17 @@
-import { App, PluginSettingTab, Setting } from 'obsidian';
+import { App, Modal, Notice, PluginSettingTab, Setting } from 'obsidian';
 import { DEFAULT_SETTINGS } from '../settings';
+import { GitHubClient, GHAuthError, GHNotFoundError } from '../github-client';
+import { PLUGIN_ID } from '../constants';
 import type JackdawPlugin from '../main';
 
 export class JackdawSettingsTab extends PluginSettingTab {
 	plugin: JackdawPlugin;
+	private client: GitHubClient;
 
-	constructor(app: App, plugin: JackdawPlugin) {
+	constructor(app: App, plugin: JackdawPlugin, client: GitHubClient) {
 		super(app, plugin);
 		this.plugin = plugin;
+		this.client = client;
 	}
 
 	display(): void {
@@ -162,5 +166,125 @@ export class JackdawSettingsTab extends PluginSettingTab {
 				area.inputEl.rows = 6;
 				area.inputEl.style.width = '100%';
 			});
+
+		// Diagnostics
+		containerEl.createEl('h2', { text: 'Diagnostics' });
+
+		new Setting(containerEl)
+			.addButton(btn =>
+				btn.setButtonText('Test connection').onClick(async () => {
+					btn.setButtonText('Testing…');
+					btn.setDisabled(true);
+					try {
+						const { owner, repo, branch } = this.plugin.settings;
+						const result = await this.client.getBranch(owner, repo, branch);
+						new Notice(`Connection OK — branch HEAD: ${result.commitSha.slice(0, 7)}`);
+					} catch (err) {
+						if (err instanceof GHAuthError) {
+							new Notice('Authentication failed — check your PAT');
+						} else if (err instanceof GHNotFoundError) {
+							new Notice('Repo or branch not found, or PAT lacks access');
+						} else {
+							new Notice(`Connection failed: ${err instanceof Error ? err.message : String(err)}`);
+						}
+					} finally {
+						btn.setButtonText('Test connection');
+						btn.setDisabled(false);
+					}
+				})
+			);
+
+		new Setting(containerEl)
+			.addButton(btn =>
+				btn.setButtonText('View log').onClick(async () => {
+					const logPath = `.obsidian/plugins/${PLUGIN_ID}/sync.log`;
+					let contents: string;
+					try {
+						const exists = await this.app.vault.adapter.exists(logPath);
+						contents = exists
+							? await this.app.vault.adapter.read(logPath)
+							: '(No log entries yet.)';
+					} catch (err) {
+						new Notice(`Failed to read log: ${err instanceof Error ? err.message : String(err)}`);
+						return;
+					}
+					new SyncLogModal(this.app, contents).open();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName('Reset sync state')
+			.setDesc('Deletes the local sync state. The next sync will be treated as a first-sync.')
+			.addButton(btn =>
+				btn.setButtonText('Reset sync state').onClick(() => {
+					new ResetSyncStateModal(this.app).open();
+				})
+			);
+
+		new Setting(containerEl)
+			.setName('Verbose logging')
+			.setDesc('Logs per-file pull and push events to the sync log. Use only when debugging.')
+			.addToggle(toggle =>
+				toggle
+					.setValue(this.plugin.settings.verboseLogging)
+					.onChange(async value => {
+						this.plugin.settings.verboseLogging = value;
+						await this.plugin.saveSettings();
+					})
+			);
+	}
+}
+
+class SyncLogModal extends Modal {
+	private contents: string;
+
+	constructor(app: App, contents: string) {
+		super(app);
+		this.contents = contents;
+	}
+
+	onOpen(): void {
+		this.titleEl.setText('Sync log');
+		this.contentEl.createEl('pre', { text: this.contents });
+		new Setting(this.contentEl)
+			.addButton(btn => btn.setButtonText('Close').onClick(() => this.close()));
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
+	}
+}
+
+class ResetSyncStateModal extends Modal {
+	onOpen(): void {
+		this.titleEl.setText('Reset sync state?');
+		this.contentEl.createEl('p', {
+			text: `This deletes .obsidian/plugins/${PLUGIN_ID}/sync-state.json. The next sync will scan the entire vault and the entire repository, and may prompt you to resolve conflicts. This does not delete any notes or any commits on GitHub.`,
+		});
+		new Setting(this.contentEl)
+			.addButton(btn => btn.setButtonText('Cancel').onClick(() => this.close()))
+			.addButton(btn =>
+				btn
+					.setButtonText('Reset')
+					.setWarning()
+					.onClick(async () => {
+						const statePath = `.obsidian/plugins/${PLUGIN_ID}/sync-state.json`;
+						try {
+							const exists = await this.app.vault.adapter.exists(statePath);
+							if (exists) {
+								await this.app.vault.adapter.remove(statePath);
+							}
+						} catch (err) {
+							new Notice(`Failed to reset sync state: ${err instanceof Error ? err.message : String(err)}`);
+							return;
+						}
+						this.close();
+						new Notice('Sync state reset.');
+					})
+			);
+	}
+
+	onClose(): void {
+		this.contentEl.empty();
 	}
 }
