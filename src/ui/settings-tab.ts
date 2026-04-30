@@ -254,7 +254,17 @@ class SyncLogModal extends Modal {
 			text: this.contents,
 			attr: { style: 'max-width:100%;overflow-x:auto;' },
 		});
+		this.contentEl.createEl('p', {
+			text: `Log file: .obsidian/plugins/${PLUGIN_ID}/sync.log (rotated copy: sync.log.1)`,
+			attr: { style: 'font-size:var(--font-ui-small);color:var(--text-muted);margin-top:0;' },
+		});
 		new Setting(this.contentEl)
+			.addButton(btn =>
+				btn.setButtonText('Copy').onClick(async () => {
+					await navigator.clipboard.writeText(this.contents);
+					new Notice('Log copied to clipboard');
+				}),
+			)
 			.addButton(btn => btn.setButtonText('Close').onClick(() => this.close()));
 	}
 
