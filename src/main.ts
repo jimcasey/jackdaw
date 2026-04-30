@@ -19,6 +19,7 @@ export default class JackdawPlugin extends Plugin {
 	private ribbon?: RibbonIcon;
 	private statusBar?: StatusBar;
 	private lastSyncAt: string | null = null;
+	private isRunningSync = false;
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
@@ -95,6 +96,11 @@ export default class JackdawPlugin extends Plugin {
 
 	async runSync(): Promise<void> {
 		if (!this.engine) return;
+		// Guard at the UI layer: without this, a second click while a sync is in
+		// flight would flip the spinner off in its own finally block — even though
+		// the first sync is still running.
+		if (this.isRunningSync) return;
+		this.isRunningSync = true;
 		this.statusBar?.setSyncing();
 		this.ribbon?.setSyncing();
 		try {
@@ -102,6 +108,7 @@ export default class JackdawPlugin extends Plugin {
 			this.handleSyncResult(result);
 		} finally {
 			this.ribbon?.setIdle();
+			this.isRunningSync = false;
 		}
 	}
 

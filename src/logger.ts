@@ -16,12 +16,12 @@ export class Logger {
 	constructor(
 		adapter: DataAdapter,
 		prefix: string,
-		verbose: boolean | (() => boolean),
+		getVerbose: () => boolean,
 		getPat: () => string,
 	) {
 		this.adapter = adapter;
 		this.prefix = prefix;
-		this.getVerbose = typeof verbose === 'function' ? verbose : () => verbose;
+		this.getVerbose = getVerbose;
 		this.getPat = getPat;
 	}
 
