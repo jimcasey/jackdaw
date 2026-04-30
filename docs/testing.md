@@ -10,6 +10,14 @@ Jackdaw authenticates with GitHub using a personal access token (PAT). Create on
 
 **Prerequisites:** create a small dedicated GitHub repository to use as your sync target (e.g. `yourname/obsidian-test`). Avoid using a production repo until you are confident in the plugin's behavior.
 
+> **Important:** the repository must already have at least one commit on the target branch (e.g. `main`). A brand-new empty repo will fail to sync because the branch ref does not exist yet. The simplest fix is to check **Add a README file** when creating the repo on GitHub, or push an empty commit:
+> ```sh
+> git clone https://github.com/<owner>/<repo>.git
+> cd <repo>
+> git commit --allow-empty -m "init"
+> git push -u origin main
+> ```
+
 1. In GitHub, go to **Settings → Developer settings → Personal access tokens → Fine-grained tokens**.
 2. Click **Generate new token**.
 3. Set an **Expiration** (90 days is a reasonable default; you will need to regenerate and re-enter it when it expires).
