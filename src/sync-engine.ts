@@ -118,7 +118,22 @@ export class SyncEngine {
 					void this.logger.warn(event, data);
 				},
 			};
-			const classified = classify(local, remote, syncState, classifierLogger);
+			const classified = await classify(local, remote, syncState, classifierLogger);
+
+			// §4.4: update state for paths where local content matches remote (staleness)
+			for (const item of classified) {
+				if (item.action !== 'state-refresh') continue;
+				const localChange = local.get(item.path);
+				const remoteChange = remote.get(item.path);
+				if (!localChange || !remoteChange?.blobSha) continue;
+				syncState.files[item.path] = {
+					path: item.path,
+					blobSha: remoteChange.blobSha,
+					contentHash: localChange.contentHash,
+					size: localChange.size,
+					isBinary: localChange.isBinary,
+				};
+			}
 
 			// Detect and resolve conflicts
 			const conflictItems = classified.filter((c): c is ConflictItem => c.action === 'conflict');
