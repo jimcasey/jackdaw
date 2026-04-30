@@ -2,8 +2,8 @@ import type { LocalChange, RemoteChange, LocalChangeType, RemoteChangeType, Clas
 import type { SyncState } from './state-store';
 import { gitBlobSha1 } from './hash';
 
-// Intentionally sync — classify() is pure with no I/O. Callers using the async
-// Logger from state-store.ts need to wrap it (e.g. (e, d) => void logger.warn(e, d)).
+// ClassifierLogger is sync so classify() callers can wrap an async logger inline
+// (e.g. (e, d) => void logger.warn(e, d)).
 export interface ClassifierLogger {
 	warn(event: string, data?: Record<string, unknown>): void;
 }

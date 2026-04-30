@@ -71,8 +71,12 @@ test('(added, added) — conflict when no bytes available for staleness check', 
 	expect(result[0]).toMatchObject({ action: 'conflict', local: 'added', remote: 'added' });
 });
 
-test('(added, added) — conflict when bytes present but hashes differ', async () => {
-	const result = await classify(makeLocal('a.md', 'added', 'hash-a'), makeRemote('a.md', 'added', 'hash-b'), EMPTY_STATE);
+test('(added, added) — conflict when bytes present but content differs', async () => {
+	const bytes = new TextEncoder().encode('local content').buffer as ArrayBuffer;
+	const contentHash = await sha256(bytes);
+	const localChanges = new Map([['a.md', { path: 'a.md', type: 'added' as const, contentHash, bytes, size: bytes.byteLength, isBinary: false }]]);
+	const remoteChanges = makeRemote('a.md', 'added', 'different-blob-sha');
+	const result = await classify(localChanges, remoteChanges, EMPTY_STATE);
 	expect(result[0]).toMatchObject({ action: 'conflict' });
 });
 
