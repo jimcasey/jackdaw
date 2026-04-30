@@ -3,9 +3,11 @@ import { Settings, DEFAULT_SETTINGS } from './settings';
 import { JackdawSettingsTab } from './ui/settings-tab';
 import { RibbonIcon } from './ui/ribbon';
 import { StatusBar } from './ui/status-bar';
+import { GitHubClient } from './github-client';
 
 export default class JackdawPlugin extends Plugin {
 	settings!: Settings;
+	client!: GitHubClient;
 
 	async onload(): Promise<void> {
 		if (Platform.isAndroidApp) {
@@ -15,7 +17,14 @@ export default class JackdawPlugin extends Plugin {
 
 		await this.loadSettings();
 
-		this.addSettingTab(new JackdawSettingsTab(this.app, this));
+		this.client = new GitHubClient(
+			() => this.settings.pat,
+			() => this.settings.owner,
+			() => this.settings.repo,
+			this.manifest.version,
+		);
+
+		this.addSettingTab(new JackdawSettingsTab(this.app, this, this.client));
 
 		let statusBar: StatusBar | undefined;
 		if (!Platform.isMobileApp) {
