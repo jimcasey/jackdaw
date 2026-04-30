@@ -10,7 +10,11 @@ import type { GitHubClient } from '../../github-client';
 import { computeLineDiff } from '../diff';
 import { createConflictRow, type ConflictRowContentState, type ConflictRowController } from './conflict-row';
 import { computeVirtualWindow } from './virtualized-list';
-import type { RepoCoords } from './conflict-resolution-modal';
+
+interface RepoCoords {
+	owner: string;
+	repo: string;
+}
 
 const COLLAPSED_ROW_HEIGHT = 48;
 const LINE_HEIGHT_PX = 20;
