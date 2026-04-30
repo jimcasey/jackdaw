@@ -4,6 +4,24 @@ Steps to configure and manually test the plugin across platforms and phases.
 
 ---
 
+## GitHub personal access token setup
+
+Jackdaw authenticates with GitHub using a personal access token (PAT). Create one before configuring the plugin.
+
+**Prerequisites:** create a small dedicated GitHub repository to use as your sync target (e.g. `yourname/obsidian-test`). Avoid using a production repo until you are confident in the plugin's behavior.
+
+1. In GitHub, go to **Settings → Developer settings → Personal access tokens → Fine-grained tokens**.
+2. Click **Generate new token**.
+3. Set an **Expiration** (90 days is a reasonable default; you will need to regenerate and re-enter it when it expires).
+4. Under **Repository access**, select **Only select repositories** and choose your sync repo.
+5. Under **Permissions → Repository permissions**, set **Contents** to **Read and write**. No other permissions are needed.
+6. Click **Generate token** and copy the value immediately — GitHub shows it only once.
+7. Paste the token into Obsidian → Settings → Jackdaw → **Personal access token**.
+
+> **Security note:** store the PAT only in the Jackdaw settings field. Do not commit it to any file. The plugin never logs it — PAT values are scrubbed from `sync.log` automatically.
+
+---
+
 ## Desktop setup (Phase 3+ gate)
 
 Before signing off on any phase from Phase 3 onward, smoke-test the plugin in Obsidian desktop:
@@ -15,7 +33,7 @@ Before signing off on any phase from Phase 3 onward, smoke-test the plugin in Ob
 2. Run `npm install && npm run build` from the repo directory.
 3. In Obsidian → Settings → Community plugins, disable Safe mode and enable **Jackdaw**.
 4. Open Settings → Jackdaw and enter:
-   - **PAT** — a GitHub personal access token with `repo` scope.
+   - **PAT** — a GitHub personal access token with `repo` scope (see [GitHub personal access token setup](#github-personal-access-token-setup) above).
    - **Repository** — `owner/repo` of a small test repo you control.
    - **Branch** — the branch to sync against (e.g. `main`).
 5. Click the sync ribbon icon. Verify the status bar shows "Syncing…" and then a success message.
