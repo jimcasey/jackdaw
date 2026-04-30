@@ -23,5 +23,8 @@
     "obsidian": "latest",
     "typescript": "^5.4.0",
     "vitest": "^4.1.5"
+  },
+  "dependencies": {
+    "diff": "^9.0.0"
   }
 }
