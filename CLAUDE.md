@@ -12,7 +12,7 @@ The full design specification is at `docs/design-specification.md` and is the au
 
 ## Project status
 
-Phase 0 (scaffold) is complete. Phase 1 (core libs) is complete. Phase 2 (sync engine) is next.
+Phase 0 (scaffold) is complete. Phase 1 (core libs) is complete. Phase 2 (sync engine) is complete. Phase 3 (UI) is complete. Phase 4 (first-sync + conflicts) is next.
 
 ## Build commands
 
@@ -33,7 +33,7 @@ npm run lint      # ESLint over src/
 
 ## Development workflow
 
-See `docs/workflow.md` for the full workflow. See `docs/human-interactions.md` for every human approval gate. ADRs live in `docs/adr/`. Planning session summaries live in `docs/sessions/`.
+See `docs/workflow.md` for the full workflow. See `docs/testing.md` for manual testing steps. ADRs live in `docs/adr/`. Planning session summaries live in `docs/sessions/`.
 
 ## Issue number shorthand
 
