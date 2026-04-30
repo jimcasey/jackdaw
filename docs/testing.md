@@ -4,9 +4,9 @@ Steps to configure and manually test the plugin across platforms and phases.
 
 ---
 
-## Desktop setup (Phase 2+ gate)
+## Desktop setup (Phase 3+ gate)
 
-Before signing off on any phase from Phase 2 onward, smoke-test the plugin in Obsidian desktop:
+Before signing off on any phase from Phase 3 onward, smoke-test the plugin in Obsidian desktop:
 
 1. Clone the repo into `<your-vault>/.obsidian/plugins/jackdaw/`.
 2. Run `npm install && npm run build`.

@@ -106,7 +106,7 @@ Example invocation for Phase 2: `/review` — then note in the PR comment prompt
 
 ## CI
 
-GitHub Actions runs lint and type-check on every PR and on pushes to `main`. Configuration lives at `.github/workflows/ci.yml`. The specific npm scripts (`typecheck`, `lint`) are wired up in Phase 0.
+GitHub Actions runs type-check, lint, and unit tests on every PR and on pushes to `main`. Configuration lives at `.github/workflows/ci.yml`. The specific npm scripts (`typecheck`, `lint`, `test`) are wired up in Phase 0.
 
 CI must pass before a PR can be merged.
 
