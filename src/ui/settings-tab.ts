@@ -199,11 +199,14 @@ export class JackdawSettingsTab extends PluginSettingTab {
 				btn.setButtonText('View log').onClick(async () => {
 					const logPath = `.obsidian/plugins/${PLUGIN_ID}/sync.log`;
 					let contents: string;
-					const exists = await this.app.vault.adapter.exists(logPath);
-					if (exists) {
-						contents = await this.app.vault.adapter.read(logPath);
-					} else {
-						contents = '(No log entries yet.)';
+					try {
+						const exists = await this.app.vault.adapter.exists(logPath);
+						contents = exists
+							? await this.app.vault.adapter.read(logPath)
+							: '(No log entries yet.)';
+					} catch (err) {
+						new Notice(`Failed to read log: ${err instanceof Error ? err.message : String(err)}`);
+						return;
 					}
 					new SyncLogModal(this.app, contents).open();
 				})
@@ -266,9 +269,14 @@ class ResetSyncStateModal extends Modal {
 					.setWarning()
 					.onClick(async () => {
 						const statePath = `.obsidian/plugins/${PLUGIN_ID}/sync-state.json`;
-						const exists = await this.app.vault.adapter.exists(statePath);
-						if (exists) {
-							await this.app.vault.adapter.remove(statePath);
+						try {
+							const exists = await this.app.vault.adapter.exists(statePath);
+							if (exists) {
+								await this.app.vault.adapter.remove(statePath);
+							}
+						} catch (err) {
+							new Notice(`Failed to reset sync state: ${err instanceof Error ? err.message : String(err)}`);
+							return;
 						}
 						this.close();
 						new Notice('Sync state reset.');

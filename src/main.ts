@@ -7,7 +7,7 @@ import { GitHubClient } from './github-client';
 
 export default class JackdawPlugin extends Plugin {
 	settings!: Settings;
-	client!: GitHubClient;
+	private client!: GitHubClient;
 
 	async onload(): Promise<void> {
 		if (Platform.isAndroidApp) {
