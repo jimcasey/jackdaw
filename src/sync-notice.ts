@@ -9,10 +9,6 @@ export interface SyncNoticeOutcome {
 	statusBar: StatusBarUpdate;
 }
 
-const SYNC_NEEDS_UI_MESSAGE =
-	"Conflict resolution UI is not yet available. Choose 'Prefer local' or 'Prefer remote' in settings, or wait for the next release.";
-const SYNC_NEEDS_UI_STATUS = 'Conflict — set conflict policy';
-
 export function formatSyncOutcome(
 	result: SyncResult,
 	now: () => string,
@@ -45,12 +41,6 @@ export function formatSyncOutcome(
 				statusBar: { kind: 'idle', lastSyncAt: lastKnownSyncAt },
 			};
 		case 'error':
-			if (result.error.name === 'SyncNeedsUIError') {
-				return {
-					toasts: [SYNC_NEEDS_UI_MESSAGE],
-					statusBar: { kind: 'error', message: SYNC_NEEDS_UI_STATUS },
-				};
-			}
 			if (result.error.name === 'GHEmptyRepoError') {
 				return {
 					toasts: [result.error.message],

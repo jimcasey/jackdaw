@@ -11,7 +11,11 @@ import { ObsidianStateAdapter } from './obsidian-state-adapter';
 import { StateStore } from './state-store';
 import { ObsidianVaultAdapter } from './obsidian-vault-adapter';
 import { SyncEngine } from './sync-engine';
-import type { SyncResult } from './sync-engine-types';
+import {
+	PolicyAwareConflictResolver,
+	PolicyAwareFirstSyncResolver,
+	type SyncResult,
+} from './sync-engine-types';
 import { formatSyncOutcome } from './sync-notice';
 
 export default class JackdawPlugin extends Plugin {
@@ -61,6 +65,14 @@ export default class JackdawPlugin extends Plugin {
 		});
 		const conflictModal = new ConflictResolutionModal(this.app, vault, client, repoCoords);
 		const firstSyncModal = new FirstSyncModal(this.app, vault, client, repoCoords);
+		const conflictResolver = new PolicyAwareConflictResolver(
+			() => this.settings.conflictPolicy,
+			conflictModal,
+		);
+		const firstSyncResolver = new PolicyAwareFirstSyncResolver(
+			() => this.settings.conflictPolicy,
+			firstSyncModal,
+		);
 
 		this.engine = new SyncEngine(
 			vault,
@@ -68,8 +80,8 @@ export default class JackdawPlugin extends Plugin {
 			stateStore,
 			logger,
 			() => this.settings,
-			conflictModal,
-			firstSyncModal,
+			conflictResolver,
+			firstSyncResolver,
 		);
 
 		if (!Platform.isMobileApp) {

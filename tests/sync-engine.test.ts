@@ -405,12 +405,11 @@ describe('normal sync', () => {
 		}
 	});
 
-	test('conflicts with always-prefer-local → ConflictResolver not called, conflict pushed', async () => {
+	test('conflict resolved keep-local → applyPush called, conflictsResolved counted', async () => {
 		const state = makeState();
 		const updatedState = makeState({ lastSyncCommitSha: 'new-commit' });
 		const { engine, conflicts } = makeEngine({
 			stateStore: makeStateStore(state),
-			settings: makeSettings({ conflictPolicy: 'always-prefer-local' }),
 		});
 
 		const conflictPath = makeClassified('conflict.md', 'conflict', 'modified', 'modified');
@@ -421,11 +420,12 @@ describe('normal sync', () => {
 			new Map([['conflict.md', makeRemoteChange('conflict.md', 'modified')]]),
 		);
 		vi.mocked(classify).mockResolvedValue([conflictPath]);
+		conflicts.resolve.mockResolvedValue(new Map([['conflict.md', 'keep-local']]));
 		vi.mocked(applyPush).mockResolvedValue({ newCommitSha: 'new-commit', updatedState });
 
 		const result = await engine.sync();
 
-		expect(conflicts.resolve).not.toHaveBeenCalled();
+		expect(conflicts.resolve).toHaveBeenCalledOnce();
 		expect(applyPush).toHaveBeenCalledOnce();
 		expect(result.status).toBe('success');
 		if (result.status === 'success') {
@@ -433,12 +433,11 @@ describe('normal sync', () => {
 		}
 	});
 
-	test('conflicts with always-prefer-remote → ConflictResolver not called, conflict pulled', async () => {
+	test('conflict resolved keep-remote → applyPull called, conflictsResolved counted', async () => {
 		const state = makeState();
 		const updatedState = makeState();
 		const { engine, conflicts } = makeEngine({
 			stateStore: makeStateStore(state),
-			settings: makeSettings({ conflictPolicy: 'always-prefer-remote' }),
 		});
 
 		const conflictPath = makeClassified('conflict.md', 'conflict', 'modified', 'modified');
@@ -449,11 +448,12 @@ describe('normal sync', () => {
 			new Map([['conflict.md', makeRemoteChange('conflict.md', 'modified')]]),
 		);
 		vi.mocked(classify).mockResolvedValue([conflictPath]);
+		conflicts.resolve.mockResolvedValue(new Map([['conflict.md', 'keep-remote']]));
 		vi.mocked(applyPull).mockResolvedValue({ updatedState, skipped: [] });
 
 		const result = await engine.sync();
 
-		expect(conflicts.resolve).not.toHaveBeenCalled();
+		expect(conflicts.resolve).toHaveBeenCalledOnce();
 		expect(applyPull).toHaveBeenCalledOnce();
 		expect(result.status).toBe('success');
 		if (result.status === 'success') {
@@ -614,9 +614,8 @@ describe('GHFastForwardError retry', () => {
 	test('conflictsResolved not double-counted across retries', async () => {
 		const state = makeState();
 		const updatedState = makeState({ lastSyncCommitSha: 'new-commit' });
-		const { engine } = makeEngine({
+		const { engine, conflicts } = makeEngine({
 			stateStore: makeStateStore(state),
-			settings: makeSettings({ conflictPolicy: 'always-prefer-local' }),
 		});
 
 		const conflictPath = makeClassified('conflict.md', 'conflict', 'modified', 'modified');
@@ -627,6 +626,7 @@ describe('GHFastForwardError retry', () => {
 			new Map([['conflict.md', makeRemoteChange('conflict.md', 'modified')]]),
 		);
 		vi.mocked(classify).mockResolvedValue([conflictPath]);
+		conflicts.resolve.mockResolvedValue(new Map([['conflict.md', 'keep-local']]));
 		vi.mocked(applyPush)
 			.mockRejectedValueOnce(new GHFastForwardError('ff'))
 			.mockResolvedValue({ newCommitSha: 'new-commit', updatedState });
