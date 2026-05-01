@@ -105,7 +105,7 @@ A first sync against a populated vault and a populated repo can mean hundreds of
 
 ### Cancelling
 
-Closing the modal (or clicking the `Cancel` button if present) aborts the sync without writing anything to your vault, the repo, or `sync-state.json`. The next sync will see the same first-sync state and prompt again. Cancelling is always safe.
+Clicking **Cancel sync** (or closing the modal) aborts the sync without writing anything to your vault, the repo, or `sync-state.json`. The next sync will see the same first-sync state and prompt again. Cancelling is always safe.
 
 ---
 
@@ -123,10 +123,10 @@ On desktop, Obsidian displays a status bar at the bottom of the window. Jackdaw 
 
 | State | Display |
 |---|---|
-| Idle, never synced | (empty) |
-| Idle, synced before | `Synced HH:MM` |
-| Currently syncing | `Syncing…` |
-| Last sync errored | `Sync error (click for details)` |
+| Idle, never synced | `Jackdaw: Never synced` |
+| Idle, synced before | `Jackdaw: Synced HH:MM` |
+| Currently syncing | `Jackdaw: Syncing…` |
+| Last sync errored | `Jackdaw: Sync error` (the full error message is exposed on hover via `aria-label`) |
 
 Mobile Obsidian has no status bar; on iOS the ribbon icon is your only at-a-glance indicator.
 
@@ -140,7 +140,7 @@ When a sync finishes, Jackdaw shows a toast notice. The text varies with the out
 | `Synced N changes.` | N files were added, modified, or deleted across both sides. |
 | `Skipped: file1, file2, file3 and N more` | Files larger than the per-file size limit. Increase the limit or move them out of the vault if you need them synced. |
 | `Sync failed: <message>. See log for details.` | A typed error stopped the sync. See [Troubleshooting](#troubleshooting) for the specific error. |
-| `Repo has no commits yet…` | `GHEmptyRepoError`. See [Empty repository](#empty-repository). |
+| (toast: `The repository exists but has no commits yet…`; status bar: `Jackdaw: Sync error`) | `GHEmptyRepoError`. See [Empty repository](#empty-repository). |
 
 The status bar mirrors the same outcome — `Synced HH:MM` on success, an error message on failure.
 
@@ -187,13 +187,14 @@ Every Jackdaw error is one of seven typed classes from `src/github-client.ts`. T
 
 **Fix.** Double-check the three Connection fields against the repo URL on GitHub. If the values are right, regenerate the PAT and confirm it grants access to that exact repo.
 
+<a id="empty-repository"></a>
 ### `GHEmptyRepoError` — empty repository
 
 **Symptom.** `Sync failed: The repository exists but has no commits yet. Push an initial commit (e.g. a README) and try again.`
 
 **Causes.** The repo was created without an initial commit, so the branch ref does not exist.
 
-**Fix.** On GitHub, edit any file (or add a README via the web UI) and commit it. Or from a clone:
+**Fix.** On GitHub, add a README via the web UI and commit it (this creates the branch ref). Or from a clone:
 
 ```sh
 git clone https://github.com/<owner>/<repo>.git
