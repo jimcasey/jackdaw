@@ -145,6 +145,9 @@
 
 .jackdaw-mobile .jackdaw-diff {
   display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-x: visible;
 }
 
 .jackdaw-mobile .jackdaw-diff-line {

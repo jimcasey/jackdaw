@@ -13,6 +13,7 @@ export interface ConflictRowOptions {
 	initialExpanded: boolean;
 	onSelect: (resolution: ConflictResolution) => void;
 	onToggle: () => void;
+	onHeightChange?: (height: number) => void;
 }
 
 export interface ConflictRowController {
@@ -20,6 +21,7 @@ export interface ConflictRowController {
 	setResolution(resolution: ConflictResolution | null): void;
 	setExpanded(expanded: boolean): void;
 	setContent(content: ConflictRowContentState): void;
+	disconnect(): void;
 }
 
 export function createConflictRow(opts: ConflictRowOptions): ConflictRowController {
@@ -112,5 +114,17 @@ export function createConflictRow(opts: ConflictRowOptions): ConflictRowControll
 	setResolution(opts.initialResolution);
 	setExpanded(opts.initialExpanded);
 
-	return { el: root, setResolution, setExpanded, setContent };
+	let observer: ResizeObserver | null = null;
+	const onHeightChange = opts.onHeightChange;
+	if (onHeightChange && typeof ResizeObserver !== 'undefined') {
+		observer = new ResizeObserver(() => onHeightChange(root.offsetHeight));
+		observer.observe(root);
+	}
+
+	function disconnect(): void {
+		observer?.disconnect();
+		observer = null;
+	}
+
+	return { el: root, setResolution, setExpanded, setContent, disconnect };
 }

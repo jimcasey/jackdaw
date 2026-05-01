@@ -195,6 +195,29 @@ describe('createConflictRow', () => {
 		expect(lineEls[2].textContent).toBe('new');
 	});
 
+	test('disconnect() can be called safely whether or not onHeightChange was passed', () => {
+		const rowWithoutObserver = createConflictRow({
+			item: makeItem(),
+			initialResolution: null,
+			initialExpanded: false,
+			onSelect: () => {},
+			onToggle: () => {},
+		});
+		expect(() => rowWithoutObserver.disconnect()).not.toThrow();
+		expect(() => rowWithoutObserver.disconnect()).not.toThrow();
+
+		const onHeightChange = vi.fn();
+		const rowWithObserver = createConflictRow({
+			item: makeItem({ path: 'notes/bar.md' }),
+			initialResolution: null,
+			initialExpanded: false,
+			onSelect: () => {},
+			onToggle: () => {},
+			onHeightChange,
+		});
+		expect(() => rowWithObserver.disconnect()).not.toThrow();
+	});
+
 	test('setContent replaces previous content rather than appending', () => {
 		const row = createConflictRow({
 			item: makeItem(),
