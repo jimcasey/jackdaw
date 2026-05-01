@@ -107,6 +107,7 @@ export class ConflictResolutionModal extends Modal implements ConflictResolver {
 		}
 		this.rowControllers.clear();
 		this.measuredHeights.clear();
+		this.rerenderScheduled = false;
 		this.listEl = null;
 		this.spacerEl = null;
 		this.applyBtn = null;

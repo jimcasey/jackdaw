@@ -116,7 +116,7 @@ export function createConflictRow(opts: ConflictRowOptions): ConflictRowControll
 
 	let observer: ResizeObserver | null = null;
 	const onHeightChange = opts.onHeightChange;
-	if (onHeightChange && typeof ResizeObserver !== 'undefined') {
+	if (onHeightChange) {
 		observer = new ResizeObserver(() => onHeightChange(root.offsetHeight));
 		observer.observe(root);
 	}

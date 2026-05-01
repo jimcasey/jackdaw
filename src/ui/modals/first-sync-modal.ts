@@ -122,6 +122,7 @@ export class FirstSyncModal extends Modal implements FirstSyncResolver {
 		}
 		this.rowControllers.clear();
 		this.measuredHeights.clear();
+		this.rerenderScheduled = false;
 		this.listEl = null;
 		this.spacerEl = null;
 		this.applyBtn = null;

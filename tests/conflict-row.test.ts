@@ -195,27 +195,95 @@ describe('createConflictRow', () => {
 		expect(lineEls[2].textContent).toBe('new');
 	});
 
-	test('disconnect() can be called safely whether or not onHeightChange was passed', () => {
-		const rowWithoutObserver = createConflictRow({
-			item: makeItem(),
-			initialResolution: null,
-			initialExpanded: false,
-			onSelect: () => {},
-			onToggle: () => {},
-		});
-		expect(() => rowWithoutObserver.disconnect()).not.toThrow();
-		expect(() => rowWithoutObserver.disconnect()).not.toThrow();
+	test('no ResizeObserver is created when onHeightChange is omitted; disconnect is still safe', () => {
+		const instances: FakeObserver[] = [];
+		class FakeObserver {
+			observe = vi.fn();
+			unobserve = vi.fn();
+			disconnect = vi.fn();
+			constructor(public cb: ResizeObserverCallback) {
+				instances.push(this);
+			}
+		}
+		const original = globalThis.ResizeObserver;
+		globalThis.ResizeObserver = FakeObserver as unknown as typeof ResizeObserver;
+		try {
+			const row = createConflictRow({
+				item: makeItem(),
+				initialResolution: null,
+				initialExpanded: false,
+				onSelect: () => {},
+				onToggle: () => {},
+			});
+			expect(instances.length).toBe(0);
+			expect(() => row.disconnect()).not.toThrow();
+			expect(() => row.disconnect()).not.toThrow();
+		} finally {
+			globalThis.ResizeObserver = original;
+		}
+	});
 
+	test('ResizeObserver is created and observed when onHeightChange is provided; disconnect() invokes the observer', () => {
+		const instances: FakeObserver[] = [];
+		class FakeObserver {
+			observe = vi.fn();
+			unobserve = vi.fn();
+			disconnect = vi.fn();
+			constructor(public cb: ResizeObserverCallback) {
+				instances.push(this);
+			}
+		}
+		const original = globalThis.ResizeObserver;
+		globalThis.ResizeObserver = FakeObserver as unknown as typeof ResizeObserver;
+		try {
+			const row = createConflictRow({
+				item: makeItem({ path: 'notes/bar.md' }),
+				initialResolution: null,
+				initialExpanded: false,
+				onSelect: () => {},
+				onToggle: () => {},
+				onHeightChange: vi.fn(),
+			});
+			expect(instances.length).toBe(1);
+			expect(instances[0].observe).toHaveBeenCalledWith(row.el);
+			expect(instances[0].disconnect).not.toHaveBeenCalled();
+			row.disconnect();
+			expect(instances[0].disconnect).toHaveBeenCalledTimes(1);
+			row.disconnect();
+			expect(instances[0].disconnect).toHaveBeenCalledTimes(1);
+		} finally {
+			globalThis.ResizeObserver = original;
+		}
+	});
+
+	test('onHeightChange receives the row offsetHeight when ResizeObserver fires', () => {
 		const onHeightChange = vi.fn();
-		const rowWithObserver = createConflictRow({
-			item: makeItem({ path: 'notes/bar.md' }),
-			initialResolution: null,
-			initialExpanded: false,
-			onSelect: () => {},
-			onToggle: () => {},
-			onHeightChange,
-		});
-		expect(() => rowWithObserver.disconnect()).not.toThrow();
+		const instances: FakeObserver[] = [];
+		class FakeObserver {
+			observe = vi.fn();
+			unobserve = vi.fn();
+			disconnect = vi.fn();
+			constructor(public cb: () => void) {
+				instances.push(this);
+			}
+		}
+		const original = globalThis.ResizeObserver;
+		globalThis.ResizeObserver = FakeObserver as unknown as typeof ResizeObserver;
+		try {
+			const row = createConflictRow({
+				item: makeItem(),
+				initialResolution: null,
+				initialExpanded: false,
+				onSelect: () => {},
+				onToggle: () => {},
+				onHeightChange,
+			});
+			Object.defineProperty(row.el, 'offsetHeight', { configurable: true, get: () => 137 });
+			instances[0].cb();
+			expect(onHeightChange).toHaveBeenCalledWith(137);
+		} finally {
+			globalThis.ResizeObserver = original;
+		}
 	});
 
 	test('setContent replaces previous content rather than appending', () => {
