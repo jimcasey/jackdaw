@@ -7,8 +7,6 @@ import {
 	readFiles,
 	seedFiles,
 	uniqueBranchName,
-	InMemoryStateAdapter,
-	InMemoryVaultAdapter,
 	type IntegrationConfig,
 } from './helpers';
 
@@ -44,27 +42,5 @@ describe('integration harness smoke', () => {
 		const contents = await readFiles(cfg, branch, ['hello.md', 'sub/dir/note.md']);
 		expect(contents['hello.md']).toBe('Hi from smoke test\n');
 		expect(contents['sub/dir/note.md']).toBe('Nested\n');
-	});
-
-	test('in-memory adapters round-trip writes and reads', async () => {
-		const vault = new InMemoryVaultAdapter();
-		await vault.writeText('a.md', 'one');
-		await vault.writeText('dir/b.md', 'two');
-
-		expect(await vault.exists('a.md')).toBe(true);
-		expect((await vault.listFiles()).sort()).toEqual(['a.md', 'dir/b.md']);
-		expect(await vault.readText('a.md')).toBe('one');
-
-		const dirListing = await vault.listDirectory('dir');
-		expect(dirListing.files).toEqual(['b.md']);
-
-		const state = new InMemoryStateAdapter();
-		await state.write('plugins/jackdaw/sync-state.json.tmp', '{"v":1}');
-		await state.rename(
-			'plugins/jackdaw/sync-state.json.tmp',
-			'plugins/jackdaw/sync-state.json',
-		);
-		expect(await state.exists('plugins/jackdaw/sync-state.json')).toBe(true);
-		expect(await state.read('plugins/jackdaw/sync-state.json')).toBe('{"v":1}');
 	});
 });

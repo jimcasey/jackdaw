@@ -5,6 +5,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Serialize runs so concurrent push + workflow_dispatch don't race on the
+# shared sandbox PAT's rate-limit pool. Don't cancel in-progress runs — they
+# need to reach teardown so per-run branches are deleted from the sandbox.
+concurrency:
+  group: integration
+  cancel-in-progress: false
+
 jobs:
   integration:
     name: Integration tests

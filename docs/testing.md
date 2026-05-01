@@ -56,7 +56,7 @@ Automated end-to-end tests that exercise the sync engine against a real GitHub r
 
 ### Sandbox repo
 
-Tests run against a dedicated sandbox repository — by default `jimcasey/jackdaw-ci-sandbox`. The repo has a long-lived `main` seed branch with a small fixture commit; each test creates a fresh per-run branch off `main` and deletes it on teardown. Nothing in the harness touches `main` directly.
+Tests run against a dedicated sandbox repository identified by the `JACKDAW_TEST_REPO` env var. The conventional value (used by CI) is `jimcasey/jackdaw-ci-sandbox`. The repo has a long-lived `main` seed branch with a small fixture commit; each test creates a fresh per-run branch off `main` and deletes it on teardown. Nothing in the harness touches `main` directly.
 
 If the sandbox repo doesn't exist yet, create it as an empty repo with a single commit on `main` (e.g. add a README on creation) before running the suite.
 
