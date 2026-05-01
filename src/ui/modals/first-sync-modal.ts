@@ -32,6 +32,7 @@ export class FirstSyncModal extends Modal implements FirstSyncResolver {
 	private readonly expanded = new Map<string, boolean>();
 	private readonly contentCache = new Map<string, ConflictRowContentState>();
 	private readonly rowControllers = new Map<string, ConflictRowController>();
+	private readonly measuredHeights = new Map<string, number>();
 
 	private listEl: HTMLElement | null = null;
 	private spacerEl: HTMLElement | null = null;
@@ -39,6 +40,7 @@ export class FirstSyncModal extends Modal implements FirstSyncResolver {
 	private confirmCheckbox: HTMLInputElement | null = null;
 	private resolvePromise: ((value: Map<string, ConflictResolution> | 'cancel') => void) | null = null;
 	private settled = false;
+	private rerenderScheduled = false;
 
 	constructor(app: App, vault: VaultAdapter, client: GitHubClient, getRepoCoords: () => RepoCoords) {
 		super(app);
@@ -54,6 +56,7 @@ export class FirstSyncModal extends Modal implements FirstSyncResolver {
 		this.expanded.clear();
 		this.contentCache.clear();
 		this.rowControllers.clear();
+		this.measuredHeights.clear();
 
 		return new Promise((resolve) => {
 			this.resolvePromise = resolve;
@@ -114,7 +117,12 @@ export class FirstSyncModal extends Modal implements FirstSyncResolver {
 		}
 		this.contentEl.empty();
 		this.modalEl.classList.remove('jackdaw-conflict-modal', 'jackdaw-first-sync-modal', 'jackdaw-mobile');
+		for (const controller of this.rowControllers.values()) {
+			controller.disconnect();
+		}
 		this.rowControllers.clear();
+		this.measuredHeights.clear();
+		this.rerenderScheduled = false;
 		this.listEl = null;
 		this.spacerEl = null;
 		this.applyBtn = null;
@@ -147,6 +155,8 @@ export class FirstSyncModal extends Modal implements FirstSyncResolver {
 
 	private getRowHeight(index: number): number {
 		const item = this.summary.conflicts[index];
+		const measured = this.measuredHeights.get(item.path);
+		if (measured !== undefined && measured > 0) return measured;
 		if (!this.expanded.get(item.path)) {
 			return COLLAPSED_ROW_HEIGHT;
 		}
@@ -155,6 +165,18 @@ export class FirstSyncModal extends Modal implements FirstSyncResolver {
 			return COLLAPSED_ROW_HEIGHT + FIXED_BLOCK_HEIGHT_PX;
 		}
 		return COLLAPSED_ROW_HEIGHT + EXPANDED_PADDING_PX + cached.lines.length * LINE_HEIGHT_PX;
+	}
+
+	private handleHeightChange(path: string, height: number): void {
+		if (height <= 0) return;
+		if (this.measuredHeights.get(path) === height) return;
+		this.measuredHeights.set(path, height);
+		if (this.rerenderScheduled) return;
+		this.rerenderScheduled = true;
+		requestAnimationFrame(() => {
+			this.rerenderScheduled = false;
+			this.renderVisible();
+		});
 	}
 
 	private renderVisible(): void {
@@ -185,6 +207,7 @@ export class FirstSyncModal extends Modal implements FirstSyncResolver {
 					initialExpanded: this.expanded.get(item.path) ?? false,
 					onSelect: (resolution) => this.handleSelect(item.path, resolution),
 					onToggle: () => this.handleToggle(item),
+					onHeightChange: (height) => this.handleHeightChange(item.path, height),
 				});
 				controller.el.style.position = 'absolute';
 				controller.el.style.left = '0';
@@ -200,6 +223,7 @@ export class FirstSyncModal extends Modal implements FirstSyncResolver {
 
 		for (const [path, controller] of this.rowControllers) {
 			if (!visiblePaths.has(path)) {
+				controller.disconnect();
 				controller.el.remove();
 				this.rowControllers.delete(path);
 			}
@@ -218,6 +242,7 @@ export class FirstSyncModal extends Modal implements FirstSyncResolver {
 		const wasExpanded = this.expanded.get(path) ?? false;
 		const nowExpanded = !wasExpanded;
 		this.expanded.set(path, nowExpanded);
+		this.measuredHeights.delete(path);
 		const controller = this.rowControllers.get(path);
 		controller?.setExpanded(nowExpanded);
 
