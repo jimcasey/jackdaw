@@ -57,32 +57,35 @@ does not want polluted with junk.
 
 **Capture**
 - A single capture surface: **text note**, opened and typed with minimum taps.
-- Automatic context on capture: **timestamp** and **coarse location**.
+- Automatic context on capture: **timestamp** and **precise (GPS) location**.
 - Capture works **offline**; notes queue locally.
 
 **Triage**
 - A **batch inbox** view of un-triaged notes.
-- Per note, three actions: **Discard**, **Snooze** (defer to next session),
-  **Keep-for-export**.
+- Per note, three actions: **Discard**, **Snooze** (defer to next session), and
+  **Keep** (the keep-for-export action).
 - Per note, **edit the note text** and **edit/correct the attached context**
   before keeping.
 
 **Export**
 - Export kept notes to **Obsidian** as markdown files, with captured context
-  written as **YAML frontmatter**.
-- After a confirmed export, the note **leaves the app** (retention model — see
-  Open Questions).
+  written as **YAML frontmatter**. Obsidian is the **only shipped v1
+  destination**.
+- **Retention: hold until sync confirmed.** A note stays local until the
+  Obsidian write is *verified successful*, then it deletes. This depends on the
+  chosen write mechanism being able to confirm success (see the write-mechanism
+  ADR and its new confirmation requirement).
 
 **Cross-cutting**
 - Single user, single device. No account, no sync, no multi-device story.
 
-> **Scope stance on "pluggable seams":** v1 ships **exactly one** capture source
-> (text), **one** context set (time + location), and **one** export destination
-> (Obsidian). Internal boundaries that keep those from being hard-wired
-> spaghetti are good engineering and welcome — but *building, testing, or
-> designing UI for a plugin system, a second source, or a second destination is
-> a non-goal.* The seam is a code-hygiene decision for tech-lead, not a v1
-> feature. See non-goals.
+> **Scope stance on "pluggable seams" (settled):** v1 ships **exactly one**
+> capture source (text), **one** context set (time + location), and **one**
+> shipped export destination (Obsidian). **Clean internal boundaries only** —
+> no plugin system, no configuration UI, and no tests for hypothetical plugins.
+> Keeping those seams from being hard-wired spaghetti is good code hygiene for
+> tech-lead; *building, testing, or designing UI for extensibility is a
+> non-goal.* See non-goals.
 
 ## 5. Explicit non-goals (v1 deliberately does NOT do)
 
@@ -90,12 +93,12 @@ does not want polluted with junk.
   it's gone from Jackdaw. There is no history, archive, or "recently exported."
 - **No organizing:** no folders, tags, categories, notebooks, or sorting during
   triage. Triage is keep/kill/snooze only.
-- **No Apple Notes destination.** The concept brief floated Apple Notes as an
-  easier stepping stone. Product position: Apple Notes delivers **zero user
-  value** for this user (their vault is Obsidian) and would be throwaway work.
-  It may still earn its place as a *tech-lead de-risking stub* inside the
-  walking skeleton — but it is **not a shipped v1 destination**. (Tee up for
-  owner — see below.)
+- **No Apple Notes as a shipped destination.** The **only** shipped v1 export
+  destination is Obsidian. Apple Notes is a **sanctioned intermediate build-order
+  milestone** (owner arbitration) — a real de-risking deliverable used to prove
+  the capture/triage loop *before* the Obsidian write path is solved — but it
+  does not ship in v1 and is not a product feature. (Build-order device under
+  the CLAUDE.md walking-skeleton rule, not v1 scope.)
 - **No AI or automated triage.** Triage is fully manual in v1.
 - **No pluggable-source or pluggable-destination product feature** (see scope
   stance above). No share-sheet ingest, quick actions, or implicit captures.
@@ -127,27 +130,35 @@ adopted behavior over a real usage period, not aggregate metrics:
    use after ~4 weeks). This is the real bar — a personal tool that gets
    abandoned failed regardless of feature completeness.
 
-## 7. Open questions (owner decisions needed)
+## 7. Settled decisions & remaining dependencies
 
-1. **Retention model after export.** Delete immediately vs. brief hold vs.
-   hold-until-sync-confirmed. Recommendation: at minimum, hold until the export
-   write is *confirmed* (guards against silent data loss into the vault), then
-   delete. "Funnel not archive" argues against any user-visible hold. Needs
-   owner call once tech-lead scopes the Obsidian write path.
-2. **"Session" definition for Snooze.** What starts/ends a triage session, and
-   therefore when a snoozed note reappears? Options: next app open, next
-   calendar day, or a manual "start session." *Sub-question: is Snooze even
-   needed in v1, or is Discard/Keep enough?* Snooze adds a note state and reentry
-   rules; product-lead leans toward **cutting Snooze from v1** unless the owner
-   knows they'll want it. (Tee up for owner.)
-3. **Keep-for-export action name.** Keep vs. Promote vs. Release. Naming, not
-   scope — but sets the app's vocabulary. Product-lead leans **Keep**.
-4. **Confirm context set = time + location only** for v1, deferring everything
-   else to the (non-feature) seam.
-5. **Obsidian write mechanism.** How a sandboxed iOS app writes into the vault
-   (share sheet vs. `obsidian://` vs. synced iCloud/Working Copy folder vs. git
-   commit to the notes repo). This is a **tech-lead ADR** and is blocking for
-   export design; product-lead only needs the outcome to confirm the export UX.
-6. **Coarse vs. precise location.** Coarse is cheaper on permissions and privacy
-   and is likely enough for "where was I." Confirm coarse is acceptable, or
-   whether precise adds real value to the notes.
+**Settled by owner arbitration (2026-07-14):**
+
+- **Retention:** hold until sync confirmed — note stays local until the Obsidian
+  write is verified, then deletes.
+- **Snooze:** kept in v1. Triage = Discard / Snooze / Keep.
+- **Keep-for-export action name:** **Keep**.
+- **Location precision:** **precise (GPS)**, not coarse.
+- **Apple Notes:** intermediate build-order milestone only; not a shipped v1
+  destination. Shipped destination is Obsidian only.
+- **Pluggable seams:** clean internal boundaries only; no plugin system/config
+  UI/plugin tests.
+- **Auto-captured context:** time + location only for v1.
+
+**Remaining dependencies / open questions (owned elsewhere, not v1 scope
+questions):**
+
+1. **Obsidian write mechanism — tech-lead ADR (blocking).** How a sandboxed iOS
+   app writes into the vault (share sheet vs. `obsidian://` vs. synced
+   iCloud/Working Copy folder vs. git commit to the notes repo). **Blocking
+   upstream dependency** for export UX *and* for the retention model: the chosen
+   mechanism **must be able to confirm a successful write**, or "hold until sync
+   confirmed" is not implementable. New hard requirement on the ADR.
+2. **Snooze "session" definition — design-lead.** What starts/ends a triage
+   session, and therefore when snoozed notes reappear (next app open / next
+   calendar day / manual "start session"). Design decision, not a scope
+   question.
+3. **Precise-location consequences — design-lead + tech-lead.** Precise GPS is a
+   heavier permission ask and a larger privacy surface. Needs a permission
+   rationale/flow (design-lead) and correct entitlement handling + graceful
+   permission-denied behavior (tech-lead).

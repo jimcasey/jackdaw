@@ -1,40 +1,49 @@
 ---
 name: project_v1_scope
-description: Jackdaw v1 MVP scope decisions and rationale — in-scope, non-goals, and the contested calls awaiting owner arbitration
+description: Jackdaw v1 MVP scope — settled decisions, owner arbitrations (incl. overrides of product-lead), and downstream dependencies
 metadata:
   type: project
 ---
 
-v1 MVP scope lives in `docs/prd/mvp-scope.md`. Key decisions and *why*, so we
-don't relitigate settled ground. Governing constraint: [[project_funnel-principle]].
+v1 MVP scope lives in `docs/prd/mvp-scope.md`. Governing constraint:
+[[project_funnel-principle]]. All open questions were arbitrated by the owner
+on 2026-07-14; treat these as settled — do not relitigate.
 
 **In scope (minimal set):** text-only capture; auto context = timestamp +
-coarse location; offline capture queue; batch triage inbox with Discard /
-Snooze / Keep-for-export; edit note text + context before keeping; export to
-Obsidian markdown with YAML frontmatter; note leaves app after confirmed export.
-Single user, single device, no account/sync.
+**precise GPS** location; offline capture queue; batch triage inbox with
+Discard / Snooze / **Keep**; edit note text + context before keeping; export to
+Obsidian markdown with YAML frontmatter; **hold-until-sync-confirmed** retention
+(note deletes only after the Obsidian write is verified). Single user, single
+device, no account/sync.
 
-**Contested scope calls I made (owner may overrule):**
-- **Cut Apple Notes as a shipped destination.** Concept brief floated it as an
-  easier MVP destination. Product position: zero user value (their vault is
-  Obsidian) = throwaway work. Allowed only as a tech-lead de-risking *stub* in
-  the walking skeleton, not a v1 feature. **Why:** MVP destination should be the
-  one that delivers real value; Obsidian is the actual deliverable.
-- **"Pluggable seams" are code hygiene, NOT a v1 feature.** v1 ships exactly one
-  capture source, one context set, one destination. Internal boundaries fine;
-  building/testing/UI for a plugin system, 2nd source, or 2nd destination is a
-  non-goal. **Why:** guards against gold-plating an extension architecture with
-  nothing to plug in. Expect tech-lead pushback (cheap-seams-now argument).
-- **Leaning to cut Snooze from v1** (logged as open question). Adds a note state
-  + reentry rules; unclear the owner needs it. **Why:** scope discipline; Discard
-  /Keep may be enough.
+**Owner arbitrations that OVERRODE my recommendation:**
+- **Snooze KEPT in v1** (I leaned to cut it). Owner sided with a real triage
+  rhythm. The "what is a session / when do snoozed notes reappear" question is
+  now a **design-lead** open question, not a scope question.
+- **Location = PRECISE GPS** (I leaned coarse for privacy/permissions). Owner
+  chose precise. Consequence: heavier permission ask + privacy surface that
+  design-lead (permission rationale/flow) and tech-lead (entitlement + denied
+  handling) must own.
+- **Apple Notes = sanctioned intermediate build-order milestone** (I argued
+  stub-only / near-zero value). Owner kept it as a real de-risking deliverable
+  used before the Obsidian write is solved — but it is NOT a shipped v1
+  destination. Shipped destination is Obsidian only.
 
-**Non-goals (sharpest):** no browsing/search/history of exported notes; no
-folders/tags/categories; no AI/auto triage; no share-sheet/quick-actions/
-implicit capture; no photos/audio/voice/links (text only); no context beyond
-time+location; no sync/backup/cloud; no markdown editor; no notifications.
+**Owner arbitrations that upheld my position:**
+- **Pluggable seams = clean internal boundaries only.** No plugin system, no
+  config UI, no tests for hypothetical plugins.
+- **Context set = time + location only** for v1.
+- **Retention = hold until sync confirmed** (matched my recommendation).
+- **Keep-for-export name = "Keep"** (my lean).
 
-**Open questions for owner:** retention model after export; Snooze session
-definition (and whether to keep Snooze); Keep-for-export name (lean "Keep");
-confirm context = time+location only; Obsidian write mechanism (tech-lead ADR,
-blocking); coarse vs precise location.
+**Downstream dependencies created:**
+- **Obsidian write mechanism = tech-lead ADR, BLOCKING** (share sheet /
+  obsidian:// / synced folder / git commit). New hard requirement: the mechanism
+  MUST be able to confirm a successful write, or hold-until-sync-confirmed is not
+  implementable. Blocks export UX + retention.
+
+**Non-goals (sharpest, unchanged):** no browsing/search/history of exported
+notes; no folders/tags/categories; no AI/auto triage; no share-sheet/quick-
+actions/implicit capture; no photos/audio/voice/links (text only); no context
+beyond time+location; no sync/backup/cloud; no markdown editor; no notifications;
+no Apple Notes as a shipped destination.
