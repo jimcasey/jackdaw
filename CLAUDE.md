@@ -6,10 +6,17 @@ docs, not here.
 
 ## Project
 
-- **App:** An iOS quick-capture inbox that grabs fleeting notes with ambient context attached automatically, lets you triage them in batches, and exports the keepers to Obsidian — a funnel into your notes system, not an archive.
-- **Codename:** Jackdaw.
-- **Platform:** iOS (native). New app, greenfield.
+- **App:** An iOS quick-capture inbox that grabs fleeting notes with ambient
+  context attached automatically, lets you triage them in batches, and exports
+  the keepers to Obsidian — a funnel into your notes system, not an archive.
+- **Codename:** Jackdaw (marketable name TBD later in the project).
+- **Platform:** iOS (native). New app, greenfield. Single user (the owner).
 - **Status:** Pre-build. Currently in product definition / technical design.
+- **Governing principle:** Jackdaw is a funnel, not an archive. Notes flow
+  Capture → Triage → Export and leave the app; it never becomes their home.
+  If a feature helps fast capture or clean handoff, it's in scope; if it moves
+  toward organizing, searching, or browsing past notes, it's out. Concept seed:
+  `docs/prd/concept-brief.md`.
 
 ## Who's who
 
