@@ -5,7 +5,11 @@ metadata:
   type: project
 ---
 
-**Build order lives in `docs/build-order.md`** (tech-lead; owner-RATIFIED and reconciled with design-lead 2026-07-14). Slice sequence:
+**Build order lives in `docs/build-order.md`** (tech-lead; owner-RATIFIED, reconciled with design-lead, then REVISED 2026-07-14 for the capture-UX/nav pivot — see [[capture-nav-and-external]]).
+
+**FINAL v1 slice order (2026-07-14, after nav pivot + external-capture DEFERRAL):** 0 skeleton ✅ · 1 bookmark/T2 ✅ · **2** in-app Capture SHEET + Triage-ROOT + SwiftData (incl. `CaptureService` seam; nav flip per ADR 0004) ▶ · **3** real Triage (inbox actions + retention early states) · **4** Location (IN-APP precise GPS only) · **5** Apple Notes export · **6** Obsidian export (v1 complete). External-capture surfaces = FAST-FOLLOW v1.x (ADR 0005), NOT in v1. The interim "external validation slice at 4′" was REMOVED; location returned to its natural post-Triage spot (in-app only). See [[capture-nav-and-external]].
+
+**ORIGINAL (pre-pivot) slice sequence, for reference:**
 
 - **Prereq:** paid Apple Developer Program enrollment (~$99/yr). Free Apple ID has 7-day provisioning + NO TestFlight. Hard gate on Slice 0.
 - **Slice 0 — Walking skeleton:** near-empty SwiftUI app (shows build number), full toolchain path signing→provisioning→archive→App Store Connect→TestFlight internal→install on owner's iPhone. Internal TestFlight = NO Beta App Review, 0 review delay; builds expire after 90 days. Does NOT retire full App Store review.

@@ -5,4 +5,5 @@
 - [Walking-skeleton build order](build-order.md) — Ratified slice sequence in docs/build-order.md; lazy vault setup, two-tab nav, Talon seam contracts, open owner calls.
 - [Stack ADRs 0002/0003](stack-recommendations.md) — Ratified: min iOS target = iOS 26 (ADR 0002), persistence = SwiftData (ADR 0003); load-bearing at Slice 0 / Slice 2.
 - [Slice 1 spec](slice-1-spec.md) — Vault bookmark write+verify harness in docs/slices/; Talon seam seed, UserDefaults storage, no-iOS-entitlement fact, T2/T1 PASS/FAIL protocol. PASSED on-device; T2 ratified.
-- [Slice 2 spec](slice-2-spec.md) — Thin capture + SwiftData in docs/slices/; Note model, MVVM↔SwiftData, AUTOSAVE-as-you-type (lazy-create/prune-on-abandon), tab-shell-now, additive migration.
+- [Slice 2 spec](slice-2-spec.md) — Thin capture + SwiftData in docs/slices/; Note model, MVVM↔SwiftData, AUTOSAVE-as-you-type (lazy-create/prune-on-abandon), additive migration. Nav flipped to sheet (see below).
+- [Capture nav pivot + external capture](capture-nav-and-external.md) — Nav flip to Triage-root + auto Capture sheet; CaptureNoteIntent seam; HARD FINDING: no-launch App Intent can't get precise GPS → external captures timestamp-only. ADR 0004/0005 recommended.

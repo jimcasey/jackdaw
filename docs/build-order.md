@@ -24,22 +24,85 @@
 
 ## The sequence at a glance
 
-| # | Slice | Risk it retires | Ships to device? |
-|---|-------|-----------------|------------------|
-| **Prereq** | Apple Developer Program enrollment | No TestFlight without it | — |
-| **0** | **Walking skeleton** — near-empty app, TestFlight → device | Signing, provisioning, TestFlight, on-device install | Yes (internal TestFlight) |
-| **1** | **Proof-point #1** — writable-bookmark write+verify (ADR gate 2a) | The single highest architectural unknown: can we persist a *writable* bookmark into the vault and confirm a write on-device? | Yes — **must** run on device |
-| **2** | **Thin capture** — text + timestamp, persisted offline queue | Local persistence store; offline capture | Yes |
-| **3** | **Location context** — precise-GPS entitlement + attach location | Permission prompts, precise/coarse toggle, denied behavior | Yes |
-| **4** | **Triage** — batch inbox: Discard / Snooze / Keep + edit | Retention state machine (incl. the *kept-but-no-destination* pending sub-state); triage loop | Yes |
-| **5** | **Apple Notes export** (intermediate milestone, not shipped; **owner-ratified, kept**) | Serializer + retention state machine *above* the seam; batch-export UX; proves the `ExportDestination` seam has two real adapters | Yes |
-| **6** | **Obsidian export** — real v1 destination | Full retention (hold-until-confirmed) on the Slice-1-proven write path; **lazy vault setup at first Keep**; stale-bookmark re-grant | Yes — v1 feature-complete |
+> **REVISED 2026-07-14 (two owner decisions).** (1) **Nav pivot** — drop the two-tab
+> shell → **Triage is the app root; Capture is a modal sheet auto-presented on
+> launch** (ADR 0004). (2) **External capture is DEFERRED ENTIRELY from v1**
+> (ADR 0005): a no-launch App Intent **cannot** get a precise GPS fix under
+> When-In-Use, so external captures would be timestamp-only — value unjustified
+> before the core loop is proven. The shared **`CaptureService` seam is still built
+> in v1** as in-app capture's own core (ready for the fast-follow); **no external
+> surface ships in v1.** Feasibility: `docs/feasibility/external-capture-precise-gps.md`.
+
+### v1 slice sequence (final)
+
+| # | Slice | Risk it retires | Status |
+|---|-------|-----------------|--------|
+| **0** | **Walking skeleton** — near-empty app, TestFlight → device | Signing, provisioning, TestFlight, on-device install | ✅ DONE |
+| **1** | **Proof-point #1** — writable-bookmark write+verify | Highest architectural unknown; ratified **T2** | ✅ DONE |
+| **2** | **In-app Capture sheet + Triage-root + SwiftData** (incl. the `CaptureService` seam) | Persistence store; nav flip (Triage root + auto Capture sheet, ADR 0004); autosave capture; the shared in-app capture core | ▶ in progress (reshaped) |
+| **3** | **Real Triage** — inbox list + swipe Keep/Snooze/Discard + note editor | Retention state machine early states (incl. *kept-but-no-destination*); triage loop; discard-undo fork settled | Next |
+| **4** | **Location context** — precise GPS (in-app) | When-In-Use entitlement, precise/coarse toggle, denied behavior, async backfill onto the live in-app draft | — |
+| **5** | **Apple Notes export** (intermediate milestone, not shipped; kept) | Serializer + retention state machine *above* the seam; proves `ExportDestination` has two real adapters | — |
+| **6** | **Obsidian export** — real v1 destination | Full hold-until-confirmed on the Slice-1 write path; lazy vault setup at first Keep; stale-bookmark re-grant | — v1 complete |
 
 Each row is a vertical slice: it builds, installs on the owner's iPhone via
-TestFlight, and does one thing end-to-end. We do not move to slice *N+1* until
-slice *N* is green on the device.
+TestFlight, and does one thing end-to-end. We do not move to the next slice until
+the current one is green.
+
+### Fast-follow / v1.x (NOT in v1)
+
+- **External capture surfaces** (Action button, Shortcuts, Control Center, Siri,
+  widget, Lock Screen) via a `CaptureNoteIntent` front-end over the **same
+  `CaptureService`** built in Slice 2. Deferred per **ADR 0005**. When built:
+  - a thin one-shot-commit front-end (text via `@Parameter`/`requestValueDialog`),
+    sharing SwiftData through a shared `AppModelContainer`;
+  - **timestamp-only** by the platform GPS constraint — a foregrounding
+    (`openAppWhenRun = true`) variant or a last-known-location cache are the only
+    routes to external location, both fast-follow spikes;
+  - enables the **ADR 0004 endgame**: once external surfaces seed the inbox, the
+    Capture sheet stops auto-presenting → bare Triage-root.
+
+> **Sequencing note (what shifted from the pre-defer draft):** the external-capture
+> validation slice is **removed from v1** (→ fast-follow). Location returns to its
+> natural spot right after Triage (Slice 4), now **in-app precise GPS only** — no
+> external dimension to build. The `CaptureService` seam stays **inside Slice 2** as
+> in-app architecture. Pre-pivot order (2 capture → 3 location → 4 triage → 5 Apple
+> Notes → 6 Obsidian) is otherwise restored, with capture reshaped to the sheet nav.
+
+### What of the existing Slice 2 code survives the nav flip
+
+- **Survives unchanged:** the `Note` `@Model`; `.modelContainer` app wiring; the
+  `CaptureViewModel` autosave logic (`edit`/`finishEditing`/`draft`); the
+  `TextEditor`/placeholder/focus capture UI; the in-memory Swift Testing approach.
+- **New in Slice 2 (kept for v1):** the shared **`CaptureService`** core (Note
+  construction + SwiftData persistence + best-effort location; no SwiftUI/AppIntents
+  imports) — built as the in-app capture's own core per ADR 0005, ready for the
+  fast-follow external front-end. (`.modelContainer` will move to a shared
+  `AppModelContainer.shared` only *when* the external intent is built in v1.x.)
+- **Changes:** `RootView` — `TabView(Capture|Triage)` → a **Triage-root** view with
+  `.sheet(isPresented:)` **auto-presenting** `CaptureView` on launch. `CaptureView`
+  becomes **sheet content** (gains a grabber/dismiss; the sheet owns its keyboard).
+  The former `TriageStubView` becomes the **Triage root list** (still read-only
+  until the real-Triage slice), not a tab.
+- **Moot / removed:** the keyboard-covers-floating-tab-bar wrinkle and any
+  "Done-button to reveal the tab bar" handling — **gone by construction**, because a
+  sheet owns its keyboard and dismissal (swipe-down dismisses the sheet → reveals
+  Triage).
+- **Better, as a side effect:** the earlier **`.onDisappear` prune-trigger
+  reliability risk disappears** — "leaving Capture" is now the **sheet's `onDismiss`
+  callback** (a single well-defined event) plus `scenePhase == .background`. More
+  deterministic than TabView tab-switch `.onDisappear`.
 
 ---
+
+> **Numbering note for the detailed sections below.** The at-a-glance table above
+> is authoritative for the **final v1 order**. The detailed per-slice write-ups that
+> follow predate the renumber and retain their original headings — map them as:
+> detailed **"Slice 3 — Location"** = final **Slice 4** (now in-app precise GPS
+> only); detailed **"Slice 4 — Triage"** = final **Slice 3**. Capture (final Slice 2)
+> now uses the sheet nav (ADR 0004) — see `docs/slices/slice-2-capture-swiftdata.md`.
+> Apple Notes (5) and Obsidian (6) are unchanged. Substance in those sections
+> (state machine, entitlement work, export) stands; only the numbers/nav shifted.
 
 ## Prerequisite — Apple Developer Program enrollment
 

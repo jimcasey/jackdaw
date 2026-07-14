@@ -42,7 +42,9 @@ does not want polluted with junk.
 
 1. **Capture a thought before I lose it** — get text out of my head with
    near-zero friction, ambient context attached automatically, no filing
-   decision at capture time.
+   decision at capture time. The capture surface should be reachable fast,
+   whether the thought strikes inside the app or from outside it (a system-level
+   trigger).
 2. **Come back later and clear the inbox** — review captured notes in a batch
    and make a fast keep-or-kill decision on each, without sorting into
    categories.
@@ -55,13 +57,26 @@ does not want polluted with junk.
 
 ## 4. In scope for v1
 
+**Launch & navigation model**
+- The app **root is Triage** (the inbox). The **Capture sheet auto-presents on
+  launch**, so the user lands ready to type; dismissing the sheet reveals Triage.
+- Capture is a **presented modal sheet**, not a tab or mode.
+- **Funnel invariant:** home is never a growing, browsable library. Triage is a
+  *to-do list that drains to empty*, not an archive. Landing on Triage is
+  landing on work-to-clear, not on a pile to browse.
+
 **Capture**
-- A single capture surface: **text note**, opened and typed with minimum taps.
+- Primary in-app surface: the **text-note capture sheet** — typed with minimum
+  taps, works while auto-presented on launch or invoked from within the app.
 - Automatic context on capture: **timestamp** and **precise (GPS) location**.
 - Capture works **offline**; notes queue locally.
+- **One shared capture seam (`CaptureNoteIntent`)** underpins in-app and external
+  capture. For v1 we **validate a single external surface — the Action button —**
+  through this seam, plus the **precise-GPS-from-an-external-intent feasibility
+  gate** (see below). Other external surfaces are v1.x (see non-goals).
 
 **Triage**
-- A **batch inbox** view of un-triaged notes.
+- A **batch inbox** view of un-triaged notes (the app root).
 - Per note, three actions: **Discard**, **Snooze** (defer to next session), and
   **Keep** (the keep-for-export action).
 - Per note, **edit the note text** and **edit/correct the attached context**
@@ -102,6 +117,13 @@ does not want polluted with junk.
 - **No AI or automated triage.** Triage is fully manual in v1.
 - **No pluggable-source or pluggable-destination product feature** (see scope
   stance above). No share-sheet ingest, quick actions, or implicit captures.
+- **No external capture surfaces beyond the one validated (Action button).**
+  Control Center control, Siri-as-primary, widget, Lock Screen, and home-screen
+  quick actions are **v1.x fast-follow** — built on the same `CaptureNoteIntent`
+  seam, not in v1. External capture does **not gate v1**.
+- **No launch-to-empty-list / browsable-home model.** The root is Triage, but
+  Triage is a drain-to-empty to-do surface; it must not become a browsable
+  library (protected by the no-browsing/no-history non-goals above).
 - **No rich media capture:** no photos, audio, voice-to-text, drawings, or web
   links as first-class types. Text only.
 - **No context providers beyond time + location** (no now-playing, weather,
@@ -144,6 +166,11 @@ adopted behavior over a real usage period, not aggregate metrics:
 - **Pluggable seams:** clean internal boundaries only; no plugin system/config
   UI/plugin tests.
 - **Auto-captured context:** time + location only for v1.
+- **Launch model:** app root is **Triage**; **Capture sheet auto-presents on
+  launch**. Capture is a presented modal sheet, not a tab/mode.
+- **Capture surfaces:** required = in-app sheet; build one `CaptureNoteIntent`
+  seam and validate the **Action button** as the single external surface for v1;
+  all other external surfaces are v1.x. External capture does not gate v1.
 
 **Remaining dependencies / open questions (owned elsewhere, not v1 scope
 questions):**
@@ -162,3 +189,9 @@ questions):**
    heavier permission ask and a larger privacy surface. Needs a permission
    rationale/flow (design-lead) and correct entitlement handling + graceful
    permission-denied behavior (tech-lead).
+4. **Precise-GPS-from-an-external-intent — tech-lead feasibility gate.** Whether
+   a capture triggered from outside the app (Action button → `CaptureNoteIntent`)
+   can reliably obtain precise GPS in that execution context. If it can't, the
+   external-capture ambition is constrained: external captures may land without
+   (or with degraded) location, which affects both the capture value and the
+   frontmatter contract. Resolve before committing external-surface scope.

@@ -1,29 +1,41 @@
 ---
 name: nav-model
-description: Jackdaw v1 navigation model — two-tab tab bar (Capture | Triage), launch-to-Capture, settings/status as a sheet not a tab.
+description: Jackdaw nav model — REVISED to Triage-root + Capture-as-sheet (no tab bar) after the two-tab model shipped a keyboard-vs-tab-bar defect on device. External capture is a proposal.
 metadata:
   type: project
 ---
 
-Jackdaw v1 navigation is a **two-tab `TabView`: `Capture` and `Triage`**. Settings
-/ vault status / export status is a **sheet** reached from a gear in the Triage nav
-bar — NOT a third tab.
+**REVISED (supersedes the earlier two-tab tab bar).** Status: the in-app change is
+recommended outright; external-capture-primary is a proposal pending owner
+ratification + tech-lead feasibility.
 
-**Why:** HIG says tab bars are for top-level *sections/modes*, not actions or
-settings (iOS 26 reiterated this with Liquid Glass tab bars). Jackdaw has exactly
-two co-equal modes used at different times — capture (in the wild) and triage
-(sit-down). Housekeeping is a subtask → sheet.
+**Recommended in-app model:** **Triage is the root** (`NavigationStack` list of
+un-triaged notes). **Capture is a modal sheet** (own keyboard, own `Done`/drag
+dismiss) invoked from a prominent capture button on Triage. Settings/Status stays a
+sheet from a gear. Note editor still a **push** within Triage. **No tab bar.**
 
-**How to apply:**
-- App **always launches to Capture with the keyboard up** — never restore last tab
-  (restoring could open onto the pile, fighting the funnel + friction mandate).
-- Note editor is a **push** within the Triage nav stack (drill-in), with the three
-  triage verbs in a bottom bar. Vault setup / location priming are **sheets**.
-- Alternative considered & rejected: Capture-as-root with Triage pushed (more
-  funnel-pure, less discoverable). Can revisit if owner wants max funnel purity
-  over convention.
-- Keyboard covers the floating tab bar at launch — intentional, matches
-  Messages/Mail; dismiss keyboard to switch tabs.
+**Why the change — the defect I own:** the original two-tab model launched keyboard-
+up on a Capture *tab*; the always-up keyboard covered the iOS 26 floating tab bar
+with no reachable dismiss. I had documented this as an acceptable "wrinkle" — on
+hardware it was a trap. Root cause: persistent tab bar + persistent keyboard fighting
+for the bottom edge. A sheet fixes it *by construction* (no tab bar underneath;
+standard compose-sheet + keyboard; always a `Done`). Also better IA: if capture is a
+quick action (esp. external), in-app capture is an *action* (button→sheet), not a
+*mode* (tab).
 
-Full doc: `docs/design/navigation-and-screen-inventory.md`. Related:
-[[funnel-nav-constraint]].
+**Launch destination:** (A) Triage-root bare (app = processing surface) if external
+capture proves low-friction; (B) Triage-root with Capture sheet auto-presented (safe
+transition default). **Recommend B now, move to A after on-device validation.** Not a
+hard doc-time commit; could be a setting but I'd rather decide once we've felt it.
+
+**External capture (proposed):** one shared App Intent surfaced on Action button /
+Siri / Control Center / Lock Screen. See [[external-capture]].
+
+**Where I pushed back:** don't make external capture *primary* until (1) on-device
+friction is validated and (2) tech-lead confirms an external intent can get a precise
+GPS fix — else external captures degrade to timestamp-only, gutting the ambient-
+context promise.
+
+Full doc: `docs/design/navigation-and-screen-inventory.md` §2. Related:
+[[funnel-nav-constraint]], [[capture-model]], [[external-capture]],
+[[native-feel-risks]].

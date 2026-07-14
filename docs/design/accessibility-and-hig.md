@@ -38,10 +38,14 @@
   reason triage is a list, not a physics-y card stack.)
 - **Haptics.** Subtle, meaningful haptics only (capture-save, discard confirm),
   respecting system haptic settings — never decorative.
-- **Safe areas & the iOS 26 floating tab bar.** Content respects safe-area insets,
-  the home indicator, and the **floating Liquid Glass tab bar** (which overlays
-  content and can minimize on scroll). Nothing important sits under the tab bar or
-  behind the keyboard permanently. Use system keyboard-avoidance.
+- **Safe areas & the keyboard.** Content respects safe-area insets, the home
+  indicator, and the keyboard. **The two-tab model is being dropped precisely
+  because a persistent tab bar + persistent keyboard collided on device** (the
+  keyboard covered the floating Liquid Glass tab bar with no reachable dismiss — a
+  real accessibility trap, worst for users who don't know the swipe-to-dismiss
+  gesture). Capture is now a **sheet** (own keyboard, own `Done`), which removes the
+  conflict by construction. Use system keyboard-avoidance; never leave the only way
+  out behind a keyboard.
 - **Dark Mode & Increase Contrast.** Use system colors/materials so both are free
   and correct.
 
@@ -51,7 +55,8 @@
 
 | Screen | Native idiom invoked | The thing most likely to go wrong |
 |--------|----------------------|-----------------------------------|
-| **Capture** | Full-bleed **autosave** editor; keyboard is the chrome (Drafts / new Apple Note); **New note** control in the keyboard toolbar (no Save button). | Coming out as a **web-form textarea + Submit button** (doubly wrong — there is no submit). Watch for a bordered input box or a Save CTA. Editor must scale with Dynamic Type; keyboard-toolbar control must not clip at accessibility sizes. **Do not announce autosave per keystroke** (VoiceOver spam) — see capture-flows §1.2. |
+| **Capture (sheet)** | Modal **sheet** (compose idiom: Mail/Messages/Reminders); full-bleed **autosave** editor; **New note** control in the keyboard toolbar (no Save button). | Web-form textarea + Submit (doubly wrong — no submit). **`Done`/close must be a real, VoiceOver-reachable button — never rely on drag-to-dismiss alone** (a drag gesture isn't discoverable to VoiceOver). Editor scales with Dynamic Type; toolbar control not clipping at accessibility sizes. **Do not announce autosave per keystroke** — see capture-flows §1.2. |
+| **External capture (App Intent)** | System text-prompt overlay (Shortcuts/`requestValueDialog`) or Siri **dictation**; triggered by Action button / Control Center / Lock Screen / Back Tap. | These are accessible for free (system UI). Give the intent + control clear labels/phrases ("Capture a note in Jackdaw"). Siri/dictation is itself an accessibility *win* (text capture without typing). Don't build a custom prompt — use the system one. |
 | **Triage inbox** | `List` + leading/trailing **swipe actions** (Mail/Reminders). | Swipe actions unreachable by VoiceOver → **must** mirror as custom actions + context menu. State-by-color-only. Rows that clip at large type. |
 | **Triage empty state** | `ContentUnavailableView`-style empty state. | The snoozed-count line accidentally becoming a **tappable list** (archive creep). It's text only. Announce "Inbox clear." |
 | **Note editor** | Push (drill-in); system date/time picker; MapKit thumbnail; bottom action bar. | Map thumbnail with no text alternative; broken/empty map when there's no location (show "No location"). Pickers are already accessible — don't replace them with custom ones. |
@@ -77,11 +82,13 @@ specific things I will call out in review:
 4. **Custom fonts / hard-coded sizes / custom toggles-and-pickers.** Use system type
    styles and system controls; they carry Dynamic Type, VoiceOver, and Dark Mode for
    free. Reinventing them is how web-shaped apps break accessibility.
-5. **A settings/tab bar with more than the two real modes,** or an "exported /
-   history" view. Both would betray the funnel and (in the tab-bar case) the HIG
-   rule that tab bars are for top-level sections, not housekeeping.
+5. **An "exported / history" view, or any browsable list of past notes.** Betrays
+   the funnel. The only content list is the un-triaged Triage inbox.
 6. **Modal permission/setup gates on first launch.** The web onboarding instinct.
-   First run must be the capture magic; setup and permission are lazy/in-context.
+   First run must not be a wizard; setup and permission are lazy/in-context.
+7. **A persistent keyboard over persistent bottom chrome** (the shipped defect).
+   Never leave the only way out of a screen hidden behind the keyboard. Capture is a
+   sheet with its own `Done`; the tab bar is gone.
 
 ---
 

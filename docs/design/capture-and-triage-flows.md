@@ -9,6 +9,68 @@ Assumptions are called out inline as **[ASSUMPTION]** where the PRD/ADR is silen
 
 ---
 
+## 0. Where capture happens — in-app sheet + external triggers (proposed)
+
+> **Status:** the shift toward *external* capture is a proposal for owner
+> ratification (product-lead is ruling scope in parallel; tech-lead feasibility is
+> held until after this report). The in-app change — Capture is a **sheet**, not a
+> tab — I recommend unconditionally (it fixes the on-device keyboard/tab-bar defect;
+> see `navigation-and-screen-inventory.md` §2).
+
+Capture can be triggered two ways, both feeding the same autosave model (§1):
+
+- **In-app:** the **Capture sheet**, opened from the Triage capture button (or
+  auto-presented on launch, option B). Full-fidelity, reliable, location-rich.
+- **External (no full app launch):** one shared App Intent (`CaptureNoteIntent`,
+  `openAppWhenRun = false`) surfaced across system entry points.
+
+### 0.1 The honest platform reality for *text* capture
+
+The thing to be clear-eyed about: **iOS widgets and Control Center controls cannot
+host a text field** — they are buttons/toggles. The *only* way to enter free text
+without fully launching the app is the **system text-prompt overlay** that an App
+Intent shows when it needs a value (`requestValueDialog`) or the Shortcuts *"Ask for
+Input"* action. That overlay is a plain system field: fine for a quick thought, but
+it is **not** our editor and not richer than opening the app. Siri offers the same
+via **dictation** (voice). Everything else can only *trigger* the intent or
+*deep-link* to the Capture sheet.
+
+### 0.2 Ranking by friction (for *typed* text capture specifically)
+
+1. **Action button → capture intent.** One physical press → system text prompt →
+   type → Done → saved, no app UI. Lowest-friction *typed* external path. Caveat:
+   dedicated HW, Pro models only, and it's a single button the owner may already
+   assign elsewhere.
+2. **Siri / "Hey Siri, note in Jackdaw…"** Zero taps, hands-free, but it's
+   **dictation** (voice→text) — socially constrained in public/quiet rooms, accuracy
+   varies. Complements typing; doesn't replace it. Also the strongest accessibility
+   entry point.
+3. **Control Center control** (iOS 18+, all devices). Swipe → tap → (text prompt or
+   deep-link to the sheet). Whether a control can surface the text prompt *itself* is
+   a **tech-lead verification** item; fallback is it opens the Capture sheet.
+4. **Lock Screen control / Back Tap.** Same intent from lock/idle, or an
+   accessibility back-tap trigger. Convenient; similar friction to Control Center.
+5. **Home-screen app quick action / Shortcuts widget.** Long-press icon → "New note"
+   deep-links to the sheet; a Shortcuts widget can run the text-prompt intent.
+6. **In-app Capture sheet.** The reliable, full-fidelity baseline — and, for *typed*
+   capture, plausibly *not slower* than the external prompt. This is why I won't yet
+   concede that external must be primary (nav doc §2.3).
+
+**Excluded:** Share Sheet (ingesting text *from* other apps is a PRD non-goal, not
+fresh capture); text-entry widgets (impossible on iOS).
+
+### 0.3 The location caveat that decides how good external capture is
+
+The product promise is *"context attached automatically."* An App Intent running
+outside the foreground app may **not** be able to get a precise GPS fix (background /
+extension location limits). If so, external captures degrade to **timestamp-only** —
+context-poor notes, which undercuts the whole reason precise location was chosen.
+**This is the sharpest open question and it's a tech-lead feasibility gate.** Design
+position: don't commit to external-*primary* until we know external captures keep
+their location. Named for the owner and tech-lead in the nav doc §2.3 / §4.
+
+---
+
 ## 1. Capture flow — autosave-as-you-type
 
 **Job:** get a thought out of my head in seconds, context attached automatically,
@@ -19,13 +81,19 @@ no filing decision, works offline.
 > continuously as it's typed, because the worst failure for a quick-capture funnel
 > is losing a fleeting thought — autosave makes that structurally impossible.
 > **Lazy creation:** a note comes into existence on the **first non-whitespace
-> character** (not on opening Capture). **Prune-on-abandon:** an empty/whitespace
+> character** (not on opening the sheet). **Prune-on-abandon:** an empty/whitespace
 > note is discarded when the user leaves Capture, so fragments never reach Triage.
+>
+> **Presentation update:** in-app Capture is now a **modal sheet** with its own
+> keyboard and its own dismiss — not a tab. This is what fixes the keyboard/tab-bar
+> trap (nav doc §2). The autosave rules below are unchanged; "leaving Capture" now
+> means **dismissing the sheet** (drag-down / `Done`).
 
 ### The flow
 
-1. **Open app → Capture is already there.** Launch lands on Capture with the
-   keyboard up and the cursor in an empty field. No tap needed to start typing.
+1. **Invoke Capture → the sheet slides up, keyboard up, cursor in an empty field.**
+   From the Triage capture button, an external trigger, or launch (option B). No tap
+   needed to start typing once it's up.
 2. **Type — and it's already safe.** Full-bleed editor, generous margins, no
    visible container box. Placeholder: e.g. *"What's on your mind?"* Multi-line;
    `Return` inserts newlines. On the first non-whitespace character the note is
@@ -41,8 +109,9 @@ no filing decision, works offline.
 5. **Offline is a non-event.** Writes go to local storage regardless of network.
    Capture never depends on connectivity or on the vault being set up.
 
-**Minimum-taps check:** app already open to Capture (keyboard up) → type. Zero taps
-beyond typing to capture a single thought. Faster than the old explicit-save model.
+**Minimum-taps check:** external — Action button → type in the system prompt → Done.
+In-app — launch (option B, sheet auto-presented) → type; or launch → tap capture →
+type. Still ~one tap beyond typing; no Save to remember.
 
 ### 1.1 The "I'm done — start the next one" moment (the key autosave question)
 
@@ -51,11 +120,14 @@ Autosave answers *"is it safe?"* but creates a new question: *"when does this no
 end and the next begin?"* Two distinct exits, both defined here so the tech-lead
 can align the mechanism:
 
-**Exit A — I'm leaving Capture** (switch to Triage, background the app, or the app
-is closed). The note is already persisted; **leaving is the commit.** No action
-needed. The moment you leave Capture with content, that thought is in the funnel and
-will appear in the Triage inbox. If the field is empty/whitespace on leave, it's
-**pruned** (never reaches Triage).
+**Exit A — I'm leaving Capture** (dismiss the sheet via drag-down or `Done`,
+background the app, or — for an external capture — finish the system prompt). The
+note is already persisted; **leaving is the commit.** No action needed. The moment
+you leave Capture with content, that thought is in the funnel and appears in Triage.
+If the field is empty/whitespace on leave, it's **pruned** (never reaches Triage).
+Because autosave means there's never unsaved data, dismissing the sheet is safe and
+needs **no "discard changes?" confirmation** — a nicety the sheet model gives us
+for free.
 
 **Exit B — I want to capture another thought right now** (rapid multi-capture,
 staying in Capture). This needs an explicit delimiter, because if the user just
@@ -76,21 +148,23 @@ keeps typing it all becomes *one* note. That delimiter is a **"New note" action:
   *appearance* once you've typed doubles as the ambient "you've captured something"
   signal — see §1.2.
 
-**Re-entry rule (funnel discipline): Capture always opens on a fresh empty note —
-it never resumes a previously captured note.** If you typed "buy milk," left, and
-come back, you get a blank field, not "buy milk" again. That note is now in Triage;
-continuing to edit it happens **in Triage**, not Capture. This is the line that
-keeps Capture from drifting into an editor/notepad: Capture is *fast in, gone to
-Triage*, never a place you browse or resume drafts.
+**Re-entry rule (funnel discipline): every fresh presentation of the Capture sheet
+opens on a new empty note — it never resumes a previously captured note.** If you
+typed "buy milk," dismissed, and re-open capture, you get a blank field, not "buy
+milk" again. That note is now in Triage; continuing to edit it happens **in
+Triage**, not Capture. This is the line that keeps Capture from drifting into an
+editor/notepad: Capture is *fast in, gone to Triage*, never a place you browse or
+resume drafts. The sheet model reinforces this — a dismissed sheet is *gone*, and
+the next invocation is a clean compose, exactly like Mail/Messages.
 
-> **Owner call to be aware of (flagged, not blocking):** the re-entry rule means a
-> quick app-background mid-sentence commits that in-progress note to Triage; on
-> return you get a fresh field, and the half-typed thought is waiting in the inbox
-> rather than still under the cursor. This is the correct funnel behavior and keeps
-> the model dead-simple ("leaving Capture = it's in the inbox"), but it can feel
-> like the app "moved" your note after a 2-second glance-away. I recommend accepting
-> it for simplicity; if it grates in real use, the softener is to resume the
-> in-progress note only when returning within a short window. Not pre-building that.
+> **Owner call to be aware of (flagged, not blocking):** the re-entry rule means
+> dismissing the sheet (or backgrounding) mid-sentence commits that in-progress note
+> to Triage; re-opening capture gives a fresh field, and the half-typed thought is
+> waiting in the inbox rather than under the cursor. Correct funnel behavior and
+> dead-simple ("leave Capture = it's in the inbox"), but it can feel like the app
+> "moved" your note after a quick glance-away. I recommend accepting it; if it grates
+> in use, the softener is to resume the in-progress note only when re-opening within
+> a short window. Not pre-building that.
 
 ### 1.2 What the user sees/feels with no Save button
 
@@ -116,13 +190,14 @@ spam. Resolution:
 
 Design owns *when* a note is pruned; naming it precisely so the mechanism matches:
 
-- **Prune is evaluated when the user *leaves* Capture** — tab switch to Triage, app
-  background/suspend, or app close. If, at that moment, the current note is
-  empty/whitespace-only, it is discarded and never created/never reaches Triage.
-- **Clearing the field while *staying* in Capture does NOT prune mid-session.** If
-  you delete everything back to empty but remain on the screen, typing again
+- **Prune is evaluated when the user *leaves* Capture** — **sheet dismiss (drag /
+  `Done`)**, app background/suspend, app close, or the end of an external-intent
+  prompt with no text. If, at that moment, the current note is empty/whitespace-only,
+  it is discarded and never created / never reaches Triage.
+- **Clearing the field while the sheet stays open does NOT prune mid-session.** If
+  you delete everything back to empty but the sheet is still up, typing again
   continues the *same* note (it hasn't been abandoned — you haven't left). It's
-  pruned only if you then leave while still empty. This avoids a jarring "note
+  pruned only if you then dismiss while still empty. This avoids a jarring "note
   destroyed while I'm still looking at it."
 - **Tapping New note with an empty field is a no-op** (nothing to bank; you're
   already on a fresh note).
@@ -145,7 +220,10 @@ A GPS fix can take a beat, and **capture must never wait on it.**
 > **Build dependency (tech-lead):** the capture write path must persist a note the
 > instant it has content, *before* a GPS fix exists, and update it on backfill (a
 > note can briefly exist with `location: pending`). Under autosave this is the
-> steady state, not an edge case — every note is persisted-then-enriched.
+> steady state, not an edge case — every note is persisted-then-enriched. **For
+> *external* capture (App Intent), whether a fix is obtainable at all outside the
+> foreground app is the open feasibility gate (§0.3) — if not, external captures are
+> timestamp-only until opened, which is a product-quality cost, not just a nicety.**
 
 ### What I will insist is *native* here
 
@@ -263,10 +341,12 @@ covers the list and loses the sense of place. Minor call; noting the alternative
 
 ## 3. Flow summary (happy path, end to end)
 
-1. Wild: open app → type (autosaved instantly) → **New note** to bank it and start
-   another, or just leave. Notes queue locally with context; empties are pruned.
-2. Later: switch to **Triage** → swipe Keep / Snooze / Discard down the list,
-   tapping in to fix up keepers → inbox reaches **"Inbox clear."**
+1. Wild: **Action button / Siri / Control Center** (or in-app capture button →
+   Capture sheet) → type (autosaved instantly) → **New note** to bank and start
+   another, or dismiss. Notes queue locally with context; empties are pruned.
+2. Later: **open the app — it's the processing surface now.** Land on **Triage** →
+   swipe Keep / Snooze / Discard down the list, tapping in to fix up keepers → inbox
+   reaches **"Inbox clear"** (the default home state when you're caught up).
 3. Kept notes flow **automatically** into the export queue and are written to the
    Obsidian vault folder, verified, then deleted from Jackdaw (no per-note export
    step — that's the whole point of the T2 folder-write decision). Pending/failed

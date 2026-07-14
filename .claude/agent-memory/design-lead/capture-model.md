@@ -14,9 +14,16 @@ quick-capture funnel; autosave makes it structurally impossible.
 - **Lazy creation:** note exists on the **first non-whitespace character** (not on
   opening Capture).
 - **Prune-on-abandon:** empty/whitespace note is discarded **when the user leaves
-  Capture** (tab switch to Triage / background / close). Clearing the field while
-  *staying* does NOT prune — typing again continues the same note; pruned only if
-  you then leave empty. Tapping New note on an empty field is a no-op.
+  Capture** — now = **dismissing the Capture sheet** (drag/`Done`) / background /
+  close / end of an external-intent prompt with no text. Clearing the field while
+  the sheet stays open does NOT prune — typing again continues the same note; pruned
+  only if you then dismiss empty. Tapping New note on an empty field is a no-op.
+
+**Presentation (revised): in-app Capture is a modal SHEET, not a tab** (own keyboard,
+own `Done`/drag dismiss) — this fixed the keyboard-vs-tab-bar defect; see
+[[nav-model]]. Autosave rules unchanged; "leaving Capture" = dismissing the sheet.
+Capture may also be triggered externally (App Intent) — see [[external-capture]].
+Dismiss needs no "discard changes?" prompt (autosave = never unsaved data).
 
 **The "start the next thought" moment (design owns this — the key UX autosave
 creates):**

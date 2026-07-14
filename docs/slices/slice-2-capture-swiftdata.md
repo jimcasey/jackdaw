@@ -122,6 +122,10 @@ struct JackdawApp: App {
             RootView()
         }
         .modelContainer(for: Note.self)   // default on-disk store in App Support
+        // NOTE: external capture is DEFERRED from v1 (ADR 0005). If/when the
+        // fast-follow CaptureNoteIntent is built, this moves to a shared
+        // `AppModelContainer.shared` so the intent (running in the app process)
+        // uses the SAME store. Not needed in v1.
     }
 }
 ```
@@ -133,54 +137,62 @@ environment. Views read it via `@Environment(\.modelContext)`. No path
 configuration needed — this is *our own* container, unrelated to the Talon vault
 bookmark (that's a user-picked external folder; this store is internal).
 
-### Decision: introduce the two-tab shell **now**, Triage as a throwaway stub
+### Nav model: Triage-root + auto-presented Capture sheet (REVISED 2026-07-14)
 
-**Call: build the real `TabView` shell this slice.** Reasoning:
-- The two-tab `Capture | Triage` navigation is already specced and ratified
-  (design nav doc §2). Building `CaptureView` into its **real home** now avoids a
-  re-wire at Slice 4.
-- The stub **solves this slice's verification gap.** The Capture screen shows *no
-  list* by design (funnel ethos — capture never opens onto the pile). So there is
-  no in-app way to *see* that a note persisted. The stubbed Triage tab becomes a
-  **temporary persistence probe**: a `@Query`-backed list/count of captured notes.
-  Capture a note → switch to Triage → see it → relaunch → still there. That is the
-  Slice-2 acceptance check, and it exercises the reads-in-view policy (§4) in a
-  low-stakes place before the real inbox at Slice 4.
+> **Owner pivoted the nav model.** The two-tab shell is **dropped**. **Triage is the
+> app root; Capture is a modal sheet that auto-presents on launch** (user still
+> lands ready to type; dismissing the sheet reveals Triage). See
+> `docs/feasibility/external-capture-precise-gps.md` and `docs/build-order.md`
+> (Slice 2′). This **supersedes** the two-tab decision in design nav doc §2 —
+> recommend recording it as **ADR 0004**.
+
+**Why this is better here (and what it fixes for free):**
+- **The keyboard-covers-floating-tab-bar bug is fixed by construction.** A sheet
+  owns its own keyboard and its own dismissal — there is no floating tab bar hiding
+  behind the keyboard, and no "Done button to reveal the tab bar" handling needed.
+  That whole wrinkle is **moot**.
+- **"Leaving Capture" becomes a single, deterministic event** — the sheet's
+  `onDismiss` — which **removes the earlier `.onDisappear`/tab-switch prune-trigger
+  reliability risk** (§4). Prune now fires on sheet dismissal + `scenePhase`
+  background.
 
 ```swift
 struct RootView: View {
+    @State private var showCapture = true          // auto-present on launch
     var body: some View {
-        TabView {
-            CaptureView()
-                .tabItem { Label("Capture", systemImage: "square.and.pencil") }
-            TriageStubView()            // THROWAWAY — replaced by the real inbox at Slice 4
-                .tabItem { Label("Triage", systemImage: "tray") }
-        }
+        TriageRootView()                           // the app root (read-only list this slice)
+            .sheet(isPresented: $showCapture, onDismiss: { /* Capture VM finishEditing runs in CaptureView */ }) {
+                CaptureView()                      // sheet content; owns its keyboard
+            }
     }
 }
 ```
 
-> Design notes to honor but not solve here: always **launch to Capture** (TabView's
-> default first tab is Capture, and we do **not** restore last-used tab). The
-> keyboard-occludes-floating-tab-bar wrinkle (nav doc §2 "One honest wrinkle") is
-> expected and intentional — dismiss keyboard to reveal the tab bar. No code needed
-> to "fix" it.
+- **Auto-present on launch** (`showCapture = true` initially) → the user still lands
+  ready to type. Endgame (owner, post-v1): once external capture surfaces exist
+  (fast-follow, ADR 0005) to seed the inbox, **stop
+  auto-presenting** → the app opens to a bare Triage root and Capture is reached
+  deliberately. That toggle is a one-line change; keep it a single source of truth.
+- `CaptureView` gains a dismiss affordance (grabber + a Cancel/Done); the autosave
+  model (§4) is otherwise unchanged.
 
-**`TriageStubView` (throwaway):** minimal — a `List` over `@Query`
-sorted-by-`createdAt` notes showing body preview + relative time, and the count.
-Mark it clearly in-file as temporary. It has **no** swipe actions, editor, or
-lifecycle — those are Slice 4, which *replaces* this file.
+**`TriageRootView` (read-only this slice — becomes the real inbox at the Triage slice):**
+also solves the verification gap. Capture shows no list by design (funnel ethos), so
+the Triage root is where you *see* persistence: a `List` over
+`@Query(sort: \Note.createdAt, order: .reverse)` showing body preview + relative
+time. **No** swipe actions / editor / lifecycle yet — those arrive at the Triage slice,
+which grows (not replaces) this view. Dismiss the Capture sheet → see the note in
+Triage → relaunch → still there = the Slice-2′ acceptance check.
 
 ### The `VaultProofView` harness and the Talon core
 
-- **`VaultProofView` is no longer the app root.** Recommendation: **park it** —
-  remove it from the view tree (RootView replaces it) but **keep the file in the
-  repo, unreferenced**, as a manual on-device Talon probe until Slice 6 builds the
-  real vault-setup + export surface. (Deleting is also defensible since git
-  preserves it; parking is lower-friction because Slice 6 reuses the exact
-  pick→bookmark→write pattern. Owner's call — see §7.)
+- **`VaultProofView` is no longer the app root** (RootView replaces it).
+  **Parked** (owner-confirmed): keep the file unreferenced as a manual on-device
+  Talon probe until the Obsidian export slice builds the real vault-setup +
+  export surface.
 - **`Jackdaw/Talon/` is untouched by this slice.** Capture persists to SwiftData
-  only; nothing here reads or writes the vault. Export/Talon re-enters at Slice 5/6.
+  only; nothing here reads or writes the vault. Export/Talon re-enters at the
+  export slices (Apple Notes / Obsidian).
 
 ---
 
@@ -281,6 +293,17 @@ final class CaptureViewModel {
 }
 ```
 
+> **Factor note construction + persistence into a `CaptureService` (ADR 0005).**
+> The `context.insert(Note(...))` / delete / save primitives above should live in a
+> small **`CaptureService`** (no SwiftUI, no AppIntents imports) that
+> `CaptureViewModel` calls — e.g. `service.insertNote(text:in:)`,
+> `service.prune(_:in:)`. In v1 this is justified purely by **in-app** use: it keeps
+> the SwiftData details in one testable place. It is *also* the shared core a
+> **fast-follow** external `CaptureNoteIntent` will reuse (external capture is
+> deferred entirely from v1 — ADR 0005), so building the seam now costs nothing extra
+> and avoids a later re-architecture. Do **not** build any external front-end or
+> App-Intent code in v1.
+
 **Why `draft = nil` on leave (and what it means for the UX):** once you have typed
 content and you leave Capture, that note is **committed to the inbox** (it will
 appear in Triage), and returning to Capture gives you a **fresh empty field** —
@@ -336,14 +359,13 @@ Behavior per design flow §1 and nav inventory screen #1:
   - `.onChange(of: scenePhase)` where new phase `== .background` →
     `vm.finishEditing(in: context)` (durability save + prune). Swipe-kill from the
     app switcher happens *after* `.background`, so this flush covers it.
-  - **Leaving Capture (tab switch):** `.onDisappear` → `vm.finishEditing(in: context)`,
-    then clear `text = ""` so returning shows a fresh field. **Reliability flag:**
-    `TabView` `.onDisappear` timing on tab switches has historically been finicky.
-    If it proves unreliable, the deterministic alternative is to hoist a
-    `selection`-bound `@State` into `RootView` and fire the leave-prune from
-    `.onChange(of: selectedTab)`. Recommend starting with `.onDisappear`; escalate
-    to the selection binding only if a fragment survives a fast tab-switch in
-    testing.
+  - **Leaving Capture = the sheet is dismissed** (swipe-down or Cancel/Done). Fire
+    `vm.finishEditing(in: context)` from the sheet's **`onDismiss`** callback (and
+    clear `text`). Under the revised nav model (§3) this is a **single deterministic
+    event** — the earlier `TabView` `.onDisappear` reliability concern is gone. (If
+    `CaptureView` needs to self-trigger before the sheet animates away, `.onDisappear`
+    on the sheet content also works; `finishEditing` is idempotent, so both firing is
+    safe.)
 
 Sketch of the essentials (not the full view):
 
