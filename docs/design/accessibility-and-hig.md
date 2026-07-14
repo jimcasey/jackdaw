@@ -23,8 +23,11 @@
   The critical case is **swipe actions**: they are invisible to VoiceOver unless
   also exposed as **accessibility custom actions**. Triage's Keep/Snooze/Discard
   must be operable entirely without swiping (custom actions + the long-press context
-  menu cover this). Status changes (note saved, note discarded, "Inbox clear,"
-  export succeeded/failed) should post VoiceOver announcements.
+  menu cover this). Status changes (note discarded, "Inbox clear," export
+  succeeded/failed) should post VoiceOver announcements — **but Capture autosave is
+  silent**: never announce "saved" per keystroke (VoiceOver already echoes typed
+  text; a repeating "saved" is spam). Announce once, concisely, on **New note**
+  ("Note captured, new note") — the one delimiting event.
 - **Contrast.** Text meets WCAG AA (≥4.5:1). **Never encode state by color alone** —
   Keep(green)/Discard(red)/Snooze(amber), and pending/failed status, each carry an
   **icon + label**, not just a hue. This covers color-blind users and grayscale.
@@ -48,7 +51,7 @@
 
 | Screen | Native idiom invoked | The thing most likely to go wrong |
 |--------|----------------------|-----------------------------------|
-| **Capture** | Full-bleed editor; keyboard is the chrome (Drafts / new Apple Note). | Coming out as a **web-form textarea + Submit button**. Watch for a bordered input box or a floating submit CTA — that's the web tell. Editor must scale with Dynamic Type. |
+| **Capture** | Full-bleed **autosave** editor; keyboard is the chrome (Drafts / new Apple Note); **New note** control in the keyboard toolbar (no Save button). | Coming out as a **web-form textarea + Submit button** (doubly wrong — there is no submit). Watch for a bordered input box or a Save CTA. Editor must scale with Dynamic Type; keyboard-toolbar control must not clip at accessibility sizes. **Do not announce autosave per keystroke** (VoiceOver spam) — see capture-flows §1.2. |
 | **Triage inbox** | `List` + leading/trailing **swipe actions** (Mail/Reminders). | Swipe actions unreachable by VoiceOver → **must** mirror as custom actions + context menu. State-by-color-only. Rows that clip at large type. |
 | **Triage empty state** | `ContentUnavailableView`-style empty state. | The snoozed-count line accidentally becoming a **tappable list** (archive creep). It's text only. Announce "Inbox clear." |
 | **Note editor** | Push (drill-in); system date/time picker; MapKit thumbnail; bottom action bar. | Map thumbnail with no text alternative; broken/empty map when there's no location (show "No location"). Pickers are already accessible — don't replace them with custom ones. |

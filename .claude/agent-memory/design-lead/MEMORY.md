@@ -1,6 +1,7 @@
 # Design Lead — Memory Index
 
 - [Navigation model](nav-model.md) — two-tab tab bar (Capture | Triage), launch-to-Capture, settings/status as a sheet.
+- [Capture model](capture-model.md) — autosave-as-you-type, no Save button; "New note" delimits; prune-on-abandon; never resumes a note.
 - [Funnel = navigation constraint](funnel-nav-constraint.md) — no browsable history anywhere; only list of note content is the Triage inbox.
 - [Snooze-session model](snooze-model.md) — next-calendar-day reappear; not browsable; anti-graveyard count nudge.
 - [Pending/failed + re-grant surfaces](export-status-surfaces.md) — status-not-content; failure-reason seam with tech-lead.

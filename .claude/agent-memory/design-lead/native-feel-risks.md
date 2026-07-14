@@ -15,6 +15,8 @@ wrong on iOS — and they're also what breaks Dynamic Type / VoiceOver / Dark Mo
 **How to apply — watch for these in comps/PRs and name the native fix:**
 1. **Boxed textarea + Submit button on Capture.** Native = full-bleed editor where
    the keyboard is the chrome (Drafts / new Apple Note). Highest-risk screen.
+   Doubly so under autosave ([[capture-model]]): there is no Save/submit at all —
+   watch for any Save CTA or a per-keystroke "Saving…/Saved" web indicator.
 2. **Custom file browser for vault setup.** Native = system document picker (also
    what mints the security-scoped bookmark). Don't rebuild Files.
 3. **Physics-y card-stack for triage.** Native = `List` + swipe actions

@@ -1,6 +1,8 @@
 # Slice 2 — Thin capture + SwiftData
 
-> **Status:** Implementation spec, ready to build. **Date:** 2026-07-14.
+> **Status:** Implementation spec, ready to build. **Revised 2026-07-14** after
+> owner arbitration: capture is now **autosave-as-you-type** (not explicit-save),
+> and the four Slice-2 calls are settled (see §7).
 > **Owner of spec:** tech-lead. **Implements:** build-order Slice 2; introduces
 > the persistence layer per ADR 0003 (SwiftData).
 > **Prereq met:** Slice 1 PASSED on-device — T2 ratified, ADR 0001 proven. The
@@ -20,11 +22,13 @@ near-zero friction, persisted locally. Honors design-lead's capture flow
 **In scope:**
 - A SwiftData `Note` `@Model` (body + timestamp + id) and the app-level
   `ModelContainer`.
-- The **Capture** screen: launch-to-capture, keyboard up, full-bleed editor,
-  explicit Save, field clears and stays. Persist locally, immediately.
+- The **Capture** screen: launch-to-capture, keyboard up, full-bleed editor, and
+  **autosave-as-you-type** — lazy row creation on the first non-whitespace
+  character, debounced autosave on change + on background, and prune-on-abandon of
+  empty fragments (§4). No explicit Save button.
 - The **two-tab `Capture | Triage` shell** (Triage is a deliberate throwaway stub
   this slice — see §3).
-- Swap the app root off `VaultProofView`.
+- Swap the app root off `VaultProofView` (park it — §3).
 
 **Out of scope (arrives at its own slice — do NOT build here):**
 - **Location** (Slice 3). No `CLLocationManager`, no location fields *yet* — but
@@ -216,81 +220,159 @@ isolated in a plain type you can test; the View holds only transient UI state an
 the framework-native read. This is the least-boilerplate arrangement that keeps
 logic auditable.
 
-### `CaptureViewModel`
+### The autosave model (owner-confirmed — this replaces explicit-save)
+
+Capture **autosaves as you type**. There is **no Save button**. Three rules, all
+owned by the `CaptureViewModel`:
+
+1. **Lazy row creation** — the `Note` row is created on the **first
+   non-whitespace character**, *not* on field focus. Opening Capture and leaving
+   without typing creates nothing.
+2. **Autosave on change (debounced) + on background** — nothing is ever lost to a
+   background/kill.
+3. **Prune-on-abandon** — an empty/whitespace-only body when **leaving Capture**
+   (tab switch, background, or the user clearing the field and leaving) deletes the
+   row, so fragments never reach Triage.
+
+### `CaptureViewModel` — owns the create / update / prune lifecycle
+
+The view-model holds a reference to the **current draft note** and an injected
+`ModelContext` per call. It never imports SwiftUI, so all of this logic is
+off-device unit-testable (§6).
 
 ```swift
 import Foundation
 import SwiftData
 
-@Observable        // Observation framework; no SwiftUI import needed here.
+@Observable                       // Observation framework; no SwiftUI import.
 final class CaptureViewModel {
-    /// Persists a note immediately. Returns the inserted note so callers
-    /// (Slice 3) can enrich it asynchronously. Does NOT block on anything.
-    @discardableResult
-    func save(text: String, in context: ModelContext) -> Note? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else { return nil }      // no blank notes
-        let note = Note(body: trimmed)
-        context.insert(note)
-        // No explicit save() call needed for the happy path: SwiftData autosaves
-        // the main context. (If we want a hard guarantee, `try? context.save()`.)
-        return note
+    /// The row currently being edited, if one exists yet. `nil` = no keystroke
+    /// with content has happened since the last time we left Capture.
+    private(set) var draft: Note?
+
+    /// Called on every text change (`.onChange(of: text)`). In-memory only —
+    /// disk persistence is handled by SwiftData autosave + the background flush.
+    func edit(_ text: String, in context: ModelContext) {
+        if draft == nil {
+            // Rule 1: lazy create on the FIRST non-whitespace character.
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            else { return }
+            let note = Note(body: text)
+            context.insert(note)
+            draft = note
+            // (Slice 3 hook: kick off the async location request bound to THIS
+            //  note instance here — see the seam-contract note below.)
+        } else {
+            draft?.body = text        // mutate in place; SwiftData tracks it
+        }
+    }
+
+    /// Called when leaving Capture (tab switch / disappear) AND on background.
+    /// Rule 3: prune an empty draft; otherwise the note stays (committed to the
+    /// inbox). Idempotent — safe to call twice (e.g. onDisappear + scenePhase).
+    func finishEditing(in context: ModelContext) {
+        guard let note = draft else { return }
+        if note.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            context.delete(note)                 // prune fragment
+        }
+        draft = nil                              // detach: next keystroke = fresh row
+        try? context.save()                      // Rule 2: durability guarantee
     }
 }
 ```
 
-> **Seam contract honored (build-order reconciliation + design flow §1 "GPS
-> timing"):** `save` persists the note **synchronously, before any GPS fix**, and
-> **returns the note**. At Slice 3, capture will (a) call `save(...)`, then (b)
-> kick off an async location fetch and set `note.latitude/longitude` on the *same*
-> context when the fix arrives — the note is never blocked on location. The
-> signature is shaped for that now; **do not** add an `await` in the capture path.
+**Why `draft = nil` on leave (and what it means for the UX):** once you have typed
+content and you leave Capture, that note is **committed to the inbox** (it will
+appear in Triage), and returning to Capture gives you a **fresh empty field** —
+the next keystroke starts a new row. This is the simplest model and it satisfies
+"nothing is ever lost" (a non-empty note is saved, not discarded). Whether leaving
+mid-edit should instead **resume the same draft** is a genuine UX fork that
+**design-lead owns** — see §7. The view-model above implements *commit-and-fresh*;
+if design specifies *resume-draft*, the change is localized (don't null `draft` on
+a non-background leave) — flag it, don't silently diverge.
 
-### `CaptureView`
+> **Seam contract still honored (build-order reconciliation + design flow §1 "GPS
+> timing"):** the note is created **synchronously in `edit(...)`, before any GPS
+> fix**, and we hold a reference to it. At Slice 3 the location request is kicked
+> off **at the create step, bound to that specific `Note` instance**, and the fix
+> is written onto *that* instance when it arrives — even if the user has already
+> moved on and `draft` has detached. So backfill lands on the correct row with **no
+> rewrite** of this path, and the capture path never `await`s location.
 
-Behavior, per design flow §1 and nav inventory screen #1:
+### Debounce vs. SwiftData autosave — the interaction to get right
 
-- **Launch to Capture, keyboard up.** Use `@FocusState` and set it `true` on
-  appear. iOS gotcha to expect: focusing *immediately* in `.onAppear` is sometimes
-  dropped; the reliable pattern is to set focus in a `.task { }` (or a
-  `DispatchQueue.main.async`) so it runs after the first layout. Note it so it
-  doesn't read as flaky.
-- **Full-bleed editor, no border, no card.** Use `TextEditor` (not a bordered
-  `TextField`). Design is explicit: this must **not** look like a web `<textarea>`
-  + submit. iOS gotcha: **`TextEditor` has no placeholder** — overlay a `Text`
-  ("What's on your mind?") shown only when the body is empty.
-- **Return inserts a newline** (default `TextEditor` behavior — do **not** remap
-  Return to save; multi-line notes need line breaks).
-- **Save is an explicit primary button** in the top bar (a `Save` / up-chevron),
-  **disabled while empty** (`text.trimmed.isEmpty`). Not Return, not auto-save.
-- **On Save:** call `viewModel.save(text:in:context)`; then **clear the field**,
-  **keep focus** (ready for the next thought — rapid multi-capture is first-class),
-  and give a **quiet confirmation** (subtle checkmark and/or a light save haptic
-  via `UINotificationFeedbackGenerator`/`.sensoryFeedback`). **Stay on Capture** —
-  do not navigate to Triage.
+This is the main new implementation subtlety. SwiftData's **main context autosaves
+by default** (`autosaveEnabled == true`): mutating `note.body` marks the context
+dirty and the framework coalesces disk writes for you. So:
+
+- **Recommended: do NOT call `context.save()` on every keystroke.** Per-keystroke
+  `save()` is disk I/O per character = jank, and it fights the built-in autosave.
+  Rely on autosave for the "as-you-type" coalescing, and add **one explicit
+  `try? context.save()` on the `.background` transition** as the hard durability
+  guarantee (in `finishEditing`). That combination *is* the "debounced autosave +
+  on background" the owner asked for, with the framework doing the debounce.
+- **If** on-device testing shows autosave latency is too loose for comfort, add a
+  lightweight explicit debounce (a cancel-and-reschedule `Task` that sleeps ~0.5s
+  after the last keystroke, then `try? context.save()`), and **disable the built-in
+  autosave** (`context.autosaveEnabled = false`) so the two mechanisms don't
+  double-save and race. Pick one owner of the save cadence; do not run both
+  hand-rolled and built-in autosave at once. Default to built-in; only reach for
+  the manual debounce if needed.
+
+### `CaptureView` — triggers wired to the view-model
+
+Behavior per design flow §1 and nav inventory screen #1:
+
+- **Launch to Capture, keyboard up.** `@FocusState` set `true` in a `.task { }`
+  (not `.onAppear` — focusing immediately on appear is unreliably dropped; running
+  it as a task after first layout is the robust pattern).
+- **Full-bleed editor, no border, no card.** `TextEditor`, not a bordered
+  `TextField` (design forbids the web `<textarea>` look). iOS gotcha: `TextEditor`
+  has **no placeholder** — overlay a `Text` ("What's on your mind?") shown only
+  when empty.
+- **Return inserts a newline** (default `TextEditor` behavior; do not remap).
+- **No Save button.** The triggers instead:
+  - `.onChange(of: text)` → `vm.edit(text, in: context)` (create/update).
+  - `.onChange(of: scenePhase)` where new phase `== .background` →
+    `vm.finishEditing(in: context)` (durability save + prune). Swipe-kill from the
+    app switcher happens *after* `.background`, so this flush covers it.
+  - **Leaving Capture (tab switch):** `.onDisappear` → `vm.finishEditing(in: context)`,
+    then clear `text = ""` so returning shows a fresh field. **Reliability flag:**
+    `TabView` `.onDisappear` timing on tab switches has historically been finicky.
+    If it proves unreliable, the deterministic alternative is to hoist a
+    `selection`-bound `@State` into `RootView` and fire the leave-prune from
+    `.onChange(of: selectedTab)`. Recommend starting with `.onDisappear`; escalate
+    to the selection binding only if a fragment survives a fast tab-switch in
+    testing.
 
 Sketch of the essentials (not the full view):
 
 ```swift
 struct CaptureView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.scenePhase) private var scenePhase
     @State private var text = ""
-    @State private var viewModel = CaptureViewModel()
+    @State private var vm = CaptureViewModel()
     @FocusState private var focused: Bool
 
     var body: some View {
-        // full-bleed TextEditor + empty-state placeholder overlay,
-        // toolbar Save button: disabled(text.trimmed.isEmpty),
-        // action: { viewModel.save(text: text, in: context); text = ""; focused = true }
-        // .task { focused = true }
+        // full-bleed TextEditor bound to $text + empty-state placeholder overlay
+        //   .focused($focused)
+        //   .onChange(of: text)      { _, new in vm.edit(new, in: context) }
+        //   .onChange(of: scenePhase){ _, p  in if p == .background { vm.finishEditing(in: context) } }
+        //   .onDisappear             { vm.finishEditing(in: context); text = "" }
+        //   .task                    { focused = true }
     }
 }
 ```
 
-**Uncommitted text is intentionally not persisted** on background/kill (design
-chose explicit save; no draft-autosave in v1). Flagging so it's a *decision*, not
-an oversight — if the owner wants crash-safety for in-progress text later, that's a
-separate, additive feature.
+> No explicit "field clears + haptic confirmation on save" step anymore — with
+> autosave there is no discrete save event to confirm. The field only clears when
+> you *leave and return* (commit-and-fresh). Rapid multi-capture in a single
+> Capture session is now "type a thought, and it's saved" continuously; if design
+> wants a per-thought separator gesture (e.g. a "new note" affordance to split one
+> Capture session into multiple notes without leaving), that is a design call
+> (§7) — the current model treats one continuous Capture session as one note.
 
 ---
 
@@ -332,40 +414,80 @@ func makeInMemoryContext() throws -> ModelContext {
 }
 ```
 
-Tests worth writing:
-- **`CaptureViewModel.save` happy path:** non-empty text → exactly one `Note`
-  inserted; `body` equals the trimmed text; `createdAt` is ~`.now`; `id` is set.
-  (Fetch with a `FetchDescriptor<Note>` and assert count == 1.)
-- **Empty/whitespace guard:** `"   \n"` → returns `nil`, inserts nothing.
-- **Trimming:** leading/trailing whitespace is stripped from the stored `body`.
-- **Multiple saves accumulate:** three saves → three distinct notes with distinct
-  `id`s.
+The autosave lifecycle is deterministic and lives entirely in the view-model, so
+it tests cleanly by driving `edit` / `finishEditing` against an in-memory context
+and fetching with a `FetchDescriptor<Note>`:
+
+- **Lazy create (Rule 1):** `edit("")` and `edit("   ")` → **zero** rows inserted,
+  `draft == nil`. `edit("h")` → **one** row, `draft != nil`, `body == "h"`.
+- **Whitespace-then-content:** `edit(" ")` (no row) → `edit(" a")` → exactly one
+  row created (first non-whitespace char triggers it).
+- **Update in place:** `edit("h")` then `edit("hello")` → still **one** row, its
+  `body == "hello"` (not a second row).
+- **Prune-on-abandon (Rule 3):** `edit("h")` then `edit("")` then
+  `finishEditing()` → **zero** rows (empty draft pruned), `draft == nil`.
+- **Commit non-empty:** `edit("keep me")` then `finishEditing()` → **one** row
+  survives, `draft == nil` (detached / committed).
+- **Idempotent finish:** calling `finishEditing()` twice in a row does not crash
+  and does not double-delete (guards on `draft`).
+- **Fresh session after commit:** `edit("one")`, `finishEditing()`, then
+  `edit("two")`, `finishEditing()` → **two** distinct rows with distinct `id`s.
 
 ### Needs the simulator (manual / UI)
 
 Only what genuinely depends on the running UI or the on-disk store:
-- **Keyboard-up-on-launch**, focus behavior, the full-bleed editor feel, Save
-  enable/disable, field-clears-and-refocuses, the confirmation haptic/checkmark.
-- **Persistence across relaunch** — the real proof SwiftData wrote to disk:
-  capture a note → (via the Triage stub) confirm it's listed → **stop and relaunch
-  the app** → confirm it's still listed. Unlike Slice 1's bookmark, this needs no
-  physical device — there's no sandbox-crossing or entitlement, it's all in our own
-  container, so the **simulator is sufficient**.
+- **Keyboard-up-on-launch**, focus behavior, the full-bleed editor feel, the
+  placeholder overlay showing/hiding.
+- **Autosave durability across relaunch** — the real proof SwiftData wrote to disk
+  *without* an explicit save: type a note → **do not** do anything else → send the
+  app to background (Home / app switcher) → **stop and relaunch** → switch to the
+  Triage stub → confirm the note is listed. Then repeat but **swipe-kill** from the
+  app switcher to confirm the `.background` flush caught it.
+- **Prune-on-abandon** — type a character then delete it back to empty → switch to
+  Triage → confirm **no** empty row appears. And: type content, switch to Triage,
+  switch back → confirm a **fresh** field and the note is in Triage (commit-and-fresh).
+- Unlike Slice 1's bookmark, none of this needs a physical device — no
+  sandbox-crossing or entitlement, it's all our own container, so the **simulator
+  is sufficient**.
 
 ---
 
-## 7. Open confirmations before implementation
+## 7. Settled decisions & the design-alignment items
 
-1. **Tab shell now?** I recommend **yes** (real `Capture | Triage` shell with a
-   throwaway Triage stub that doubles as the persistence probe). Confirm, or say
-   "capture-only until Slice 4" if you'd rather stay minimal.
-2. **Model fields — defer location + status to their slices?** I recommend **yes**
-   (§2), relying on SwiftData additive lightweight migration + store-reset
-   pre-release. Confirm you're comfortable *not* pre-adding those fields.
-3. **`VaultProofView`:** park (keep unreferenced) vs. delete. I recommend **park**
-   until Slice 6 supersedes it. Either is fine.
-4. **Uncommitted capture text is intentionally not draft-saved** on background/kill
-   (design's explicit-save choice). Confirm that's acceptable for v1.
+**Owner-arbitrated 2026-07-14 (the four Slice-2 calls — now settled, not open):**
+1. **Two-tab `Capture | Triage` shell is built now**, Triage a throwaway stub that
+   doubles as the persistence-verification list. (§3)
+2. **Location (Slice 3) and status (Slice 4) fields are deferred** — Note stays
+   minimal; rely on additive lightweight migration + pre-release store reset. (§2)
+3. **`VaultProofView` is parked** (unreferenced; Talon core untouched). (§3)
+4. **Capture is autosave-as-you-type**, replacing the explicit-save model:
+   lazy row creation on first non-whitespace char, debounced autosave + background
+   flush, prune-on-abandon of empty fragments. (§4)
+
+**Design-alignment items (design-lead is updating its capture-flow doc in
+parallel; the save-path mechanics depend on these UX calls — align to design, flag
+disagreement, do not silently diverge):**
+
+- **Rapid multi-capture within one session** (design flow §1.5: "throw in three
+  thoughts in a row"). The autosave model as specified treats **one continuous
+  Capture session as one note** — the field only resets on leave-and-return. If the
+  owner/design still want three-in-a-row *without leaving Capture*, we need an
+  **in-session "new note" trigger** (e.g. a small "+"/new affordance, or a
+  double-return convention). This is the sharpest interaction change the autosave
+  override introduces vs. the current design doc; it needs a design ruling. The
+  view-model supports it trivially (call `finishEditing` then clear the field on
+  that gesture) — but the *gesture* is design's to define.
+- **Leave-mid-edit semantics:** *commit-and-fresh* (implemented) vs. *resume the
+  same draft* on return. (§4 "Why `draft = nil` on leave".)
+- **Prune trigger reliability:** the exact leave events that must prune
+  (tab-switch, background, field-cleared-then-leave). If design's updated flow adds
+  or removes a leave path, the `finishEditing` call sites must match it. The
+  `.onDisappear` vs. `selection`-binding choice (§4) is an implementation detail
+  under whatever leave-set design specifies.
+- **Discard-undo fork (Slice 4, still parked):** unaffected mechanically by this
+  slice, but note the autosave model *strengthens* the "nothing is lost" posture at
+  capture, which is adjacent to the undo-banner debate at triage. Still an owner
+  call at Slice 4.
 
 ## Related
 - Design capture flow: `docs/design/capture-and-triage-flows.md` §1

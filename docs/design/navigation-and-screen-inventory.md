@@ -99,7 +99,7 @@ the accessibility requirements that most affect *this* screen (full baseline in
 
 | # | Screen | Role | HIG pattern | A11y flags |
 |---|--------|------|-------------|-----------|
-| 1 | **Capture** | Launch/home. Full-bleed text editor, keyboard up, context attached silently. | Full-screen content view; keyboard is the primary chrome (like Drafts/new Apple Note). NOT a bordered textarea + submit button. | Dynamic Type in editor incl. accessibility sizes; Save ≥44pt; save haptic; VoiceOver: field labeled, Save labeled. |
+| 1 | **Capture** | Launch/home. Full-bleed **autosave** editor, keyboard up, context attached silently. **No Save button** (autosave-as-you-type); a **New note** control in the keyboard toolbar delimits one thought from the next. | Full-screen content view; keyboard is the primary chrome (like Drafts/new Apple Note). NOT a bordered textarea + submit button. | Dynamic Type in editor incl. accessibility sizes; New-note control ≥44pt + labeled; no per-keystroke VoiceOver "saved" spam; capture haptic on New note. |
 | 2 | **Triage inbox** | Batch list of un-triaged notes; per-row Keep/Snooze/Discard + tap-to-edit. | `List` with leading/trailing **swipe actions**; nav stack root; nav-bar gear → Settings sheet. | Swipe actions **must** be mirrored as VoiceOver custom actions + a context menu; state never by color alone; row height reflows with Dynamic Type. |
 | 2a | **Triage empty state** | The reward: "Inbox clear." Notes snoozed-until-later acknowledged as a count only. | Standard empty-state (`ContentUnavailableView`). | Announce "Inbox clear" via VoiceOver; readable at accessibility text sizes. |
 

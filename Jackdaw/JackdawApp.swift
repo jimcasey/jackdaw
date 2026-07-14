@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 // The @main attribute marks the app's entry point — the iOS equivalent of a
 // `main()` function. `App` is a SwiftUI protocol; its `body` returns the scene
@@ -7,9 +8,11 @@ import SwiftUI
 struct JackdawApp: App {
     var body: some Scene {
         WindowGroup {
-            // Slice 1: the app shows the vault-proof harness while we retire the
-            // bookmark write+verify risk. Swap back / move to a real root at Slice 6.
-            VaultProofView()
+            RootView()
         }
+        // Creates the SwiftData container (schema = Note), stores it in the app's
+        // Application Support directory inside the sandbox, and injects a main
+        // ModelContext into the environment. Unrelated to the Talon vault bookmark.
+        .modelContainer(for: Note.self)
     }
 }

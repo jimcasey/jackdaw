@@ -13,8 +13,9 @@ Non-negotiable accessibility baseline for every screen (details:
 - **VoiceOver:** all controls labeled; **swipe actions MUST be mirrored as
   accessibility custom actions + a long-press context menu** (swipe actions are
   invisible to VoiceOver otherwise). Triage Keep/Snooze/Discard fully operable
-  without swiping. Announce state changes (saved, discarded, "Inbox clear",
-  export result).
+  without swiping. Announce state changes (discarded, "Inbox clear", export result).
+  **Capture autosave is silent** — never announce "saved" per keystroke (VoiceOver
+  spam); announce once on "New note" only. See [[capture-model]].
 - **Contrast** WCAG AA (≥4.5:1); **never encode state by color alone** —
   Keep/Discard/Snooze and pending/failed each carry icon + label.
 - **Touch targets** ≥ 44×44 pt (Save, three verbs, Retry, Re-grant, Undo).

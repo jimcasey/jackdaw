@@ -1,6 +1,6 @@
 ---
 name: slice-2-spec
-description: Slice 2 spec decisions — thin capture + SwiftData; the Note model shape, the MVVM↔SwiftData reconciliation (reads-in-view / writes-in-viewmodel), tab-shell-now call, and schema-evolution stance.
+description: Slice 2 spec decisions — thin capture + SwiftData; Note model shape, MVVM↔SwiftData reconciliation (reads-in-view/writes-in-VM), AUTOSAVE-as-you-type capture model (lazy-create/prune-on-abandon), tab-shell-now, schema-evolution stance.
 metadata:
   type: project
 ---
@@ -17,15 +17,24 @@ metadata:
 - WRITES/business logic go through a small `@Observable CaptureViewModel` that is NOT SwiftUI-coupled and receives a `ModelContext` INJECTED per call (never reaches the environment) → stays off-device-testable.
 - This is the pragmatic MVVM CLAUDE.md actually asks for (separation + testability without dogma).
 
-**Capture flow (honors design §1):** launch-to-Capture keyboard-up; full-bleed `TextEditor` (NOT bordered TextField — design forbids web-textarea look); Return = newline (do NOT remap to save); explicit top-bar Save button disabled-when-empty (not Return, not auto-save); on Save persist immediately, clear field, KEEP focus, quiet haptic/checkmark, STAY on Capture (rapid multi-capture is first-class). iOS gotchas noted: `TextEditor` has NO placeholder (overlay a Text); focus-on-appear is flaky in `.onAppear` — set focus in `.task`. **Seam contract:** `CaptureViewModel.save(text:in:) -> Note?` persists synchronously BEFORE any GPS fix and RETURNS the note so Slice 3 backfills location async on the same context — do NOT add `await` to the capture path. Uncommitted in-progress text is intentionally NOT draft-saved (design's explicit-save choice).
+**CAPTURE = AUTOSAVE-AS-YOU-TYPE (owner override 2026-07-14, replaced the earlier explicit-save model).** Three owner-confirmed rules, all owned by `@Observable CaptureViewModel` holding `private(set) var draft: Note?` + injected `ModelContext` per call:
+- **Lazy row creation** on the FIRST non-whitespace char (NOT on focus) — no empty rows from just opening Capture. In `edit(_ text:in:)`: if `draft==nil` and trimmed non-empty → `context.insert(Note(body:text)); draft=note`; else `draft?.body = text`.
+- **Debounced autosave + background flush** — RELY on SwiftData mainContext built-in autosave (`autosaveEnabled` default true) for as-you-type coalescing; do NOT `context.save()` per keystroke (jank + fights autosave). Add ONE explicit `try? context.save()` on `.background` for durability. Only if autosave latency is too loose, hand-roll a ~0.5s cancel/reschedule Task debounce AND set `context.autosaveEnabled=false` (one owner of save cadence — never both).
+- **Prune-on-abandon** in `finishEditing(in:)` (idempotent, guards on draft): if draft body trimmed-empty → `context.delete`; then `draft=nil` (detach → next keystroke = fresh row); `try? context.save()`.
 
-**App wiring calls:**
-- `.modelContainer(for: Note.self)` on the app scene (default on-disk store in App Support, internal — unrelated to the Talon vault bookmark).
-- **Two-tab `Capture | Triage` shell introduced NOW** (recommended): building CaptureView into its real home avoids a Slice-4 re-wire, AND the throwaway `TriageStubView` (a `@Query` list/count of captured notes) solves the Slice-2 verification gap (Capture shows no list by design, so the stub is how you SEE persistence across relaunch). Stub is replaced by the real inbox at Slice 4. Always launch to Capture (don't restore last tab). Keyboard-hides-floating-tab-bar wrinkle is intentional (design), no fix needed.
-- **`VaultProofView`:** park (keep file, unreference from root) until Slice 6 supersedes it; deleting also fine (git preserves). Talon core untouched.
+**Trigger wiring in CaptureView:** `.onChange(of: text)`→`vm.edit`; `.onChange(of: scenePhase)` `.background`→`vm.finishEditing` (covers swipe-kill, which happens after background); `.onDisappear`→`vm.finishEditing` + clear `text=""`. **iOS gotchas:** TabView `.onDisappear` on tab-switch is historically finicky — if a fragment survives a fast tab-switch, hoist a `selection`-bound `@State` in RootView and prune on `.onChange(of: selectedTab)`. `TextEditor` has NO placeholder (overlay a Text). Focus-on-launch: set `@FocusState` true in `.task` (NOT `.onAppear` — dropped). Full-bleed `TextEditor`, NOT bordered TextField (design forbids web-textarea look); Return = newline (don't remap). No Save button, no per-save haptic/confirmation (no discrete save event); field clears only on leave→return (commit-and-fresh).
 
-**Testing:** off-device Swift Testing with an IN-MEMORY container (`ModelConfiguration(isStoredInMemoryOnly: true)`): CaptureViewModel.save happy path (1 note, trimmed body, createdAt~now, id set), empty/whitespace guard (nil, no insert), trimming, multiple-saves-accumulate. Simulator-only: keyboard-up-on-launch/focus/editor feel/Save enable-disable/haptic, and persistence-across-relaunch (capture → Triage stub shows it → relaunch → still there; simulator suffices — no device needed, all in-container).
+**Seam contract (Slice 3 backfill, still honored):** note is created synchronously in `edit()` before any GPS fix; Slice 3 kicks off the async location request AT THE CREATE STEP bound to THAT specific `Note` instance, and writes the fix onto that instance when it arrives — even after `draft` detaches. No `await` in the capture path; no rewrite needed.
 
-**Open owner confirmations:** (1) tab shell now (rec yes); (2) defer location/status fields to their slices (rec yes); (3) VaultProofView park vs delete (rec park); (4) uncommitted text not draft-saved is acceptable (rec yes).
+**App wiring:** `.modelContainer(for: Note.self)` on the app scene (default on-disk store in App Support — internal, unrelated to Talon vault bookmark). **Two-tab `Capture | Triage` shell built NOW** with throwaway `TriageStubView` (`@Query` list/count of notes) that doubles as the persistence-verification surface (Capture shows no list by design). Stub replaced by real inbox at Slice 4. Always launch to Capture. **`VaultProofView` PARKED** (unreferenced; Talon core `Jackdaw/Talon/` UNTOUCHED).
+
+**Testing:** off-device Swift Testing, IN-MEMORY container (`ModelConfiguration(isStoredInMemoryOnly: true)`), drive `edit`/`finishEditing`: lazy-create (empty/whitespace→0 rows; first non-ws→1), update-in-place (not a 2nd row), prune-empty-on-finish→0, commit-non-empty→1+detach, idempotent finish, fresh-session-after-commit→2 distinct ids. Simulator-only: keyboard-up/focus/placeholder; autosave durability across relaunch (type → background → relaunch → Triage stub shows it; also swipe-kill variant); prune-on-abandon (type-then-clear-then-leave → no empty row); commit-and-fresh.
+
+**ALL FOUR owner calls now SETTLED (2026-07-14):** (1) tab shell now = YES; (2) defer location/status fields = YES; (3) VaultProofView = PARK; (4) capture = AUTOSAVE (not explicit-save).
+
+**Design-alignment items OUTSTANDING (design-lead updating its capture-flow doc in parallel — align to it, flag disagreement):**
+- **Rapid multi-capture** (design §1.5 "three thoughts in a row"): autosave model = ONE continuous Capture session is ONE note (field resets only on leave→return). Three-in-a-row WITHOUT leaving needs an in-session "new note" trigger/gesture — DESIGN's to define; VM supports it (finishEditing + clear on that gesture). This is the sharpest divergence from the old design doc.
+- Leave-mid-edit: commit-and-fresh (implemented) vs resume-draft — design's call.
+- Exact prune leave-set (tab-switch/background/cleared-then-leave) must match design's updated flow.
 
 See [[slice-1-spec]] (Talon seed + T2), [[stack-recommendations]] (ADR 0003 SwiftData), [[build-order]] (Slice 2 context + seam contracts).
