@@ -6,7 +6,7 @@ docs, not here.
 
 ## Project
 
-- **App:** <one-line description of what the app does — FILL IN>
+- **App:** An iOS quick-capture inbox that grabs fleeting notes with ambient context attached automatically, lets you triage them in batches, and exports the keepers to Obsidian — a funnel into your notes system, not an archive.
 - **Codename:** Jackdaw.
 - **Platform:** iOS (native). New app, greenfield.
 - **Status:** Pre-build. Currently in product definition / technical design.
