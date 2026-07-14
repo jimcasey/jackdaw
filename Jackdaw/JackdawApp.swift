@@ -7,7 +7,9 @@ import SwiftUI
 struct JackdawApp: App {
     var body: some Scene {
         WindowGroup {
-            SkeletonView()
+            // Slice 1: the app shows the vault-proof harness while we retire the
+            // bookmark write+verify risk. Swap back / move to a real root at Slice 6.
+            VaultProofView()
         }
     }
 }
