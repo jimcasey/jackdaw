@@ -1,7 +1,8 @@
 # ADR 0001 — Obsidian vault write mechanism
 
-> **Status:** Accepted — T2 (folder-write, local vault, Obsidian Sync). One
-> implementation-level gate (writable bookmark) deferred to the walking skeleton.
+> **Status:** Accepted & **proven on-device** (2026-07-14) — T2 (folder-write,
+> local vault, Obsidian Sync). Both verification gates PASS via the Slice 1
+> proof-point; the git fallback was not needed.
 > **Date:** 2026-07-14
 > **Owner of decision:** tech-lead, arbitrated by owner
 > **Codename:** the write-adapter subsystem is *Talon* (the claw that sets the
@@ -294,21 +295,19 @@ a move to iCloud — that was the concern, and it is not the case.
    apps. This is satisfied by T2 (local + Obsidian Sync) with no relocation
    needed.
 2. **Can an external app persist a writable bookmark into the vault folder, and
-   does Obsidian ingest the file? — PART (b) RESOLVED, PART (a) DEFERRED TO THE
-   WALKING SKELETON.**
+   does Obsidian ingest the file? — FULLY RESOLVED (2026-07-14). Both parts PASS.**
    - **(b) Obsidian ingests an externally-written `.md` — CONFIRMED on-device by
      the owner (2026-07-14).** Hand-dropping a `.md` into
      `On My iPhone/Obsidian/<vault>` via Files surfaced it cleanly in Obsidian on
-     both iOS and macOS (via Obsidian Sync), no ignore/duplicate. This validates
-     the vault-location + Obsidian-Sync half of T2.
+     both iOS and macOS (via Obsidian Sync), no ignore/duplicate.
    - **(a) The document picker returns a *persistently writable* security-scoped
-     bookmark into that folder — NOT hand-checkable; it is a property of a real
-     app talking to the picker.** It therefore becomes the **first proof-point of
-     the walking skeleton**: the earliest thin slice must pick the vault folder,
-     persist a bookmark, resolve it on a later cold launch, and write+verify a
-     file — on a physical device via TestFlight. Retiring this is exactly the
-     platform-risk-first intent of the de-risking rule. If it fails, fall back to
-     T1 (gate 3).
+     bookmark into that folder — CONFIRMED on-device (2026-07-14) via the Slice 1
+     proof-point harness.** The app picked the vault folder, persisted a
+     security-scoped bookmark, resolved it after a **cold relaunch** (killed from
+     the app switcher), and wrote + read-back-verified a `.md` — which then
+     appeared in Obsidian on both iPhone and Mac via Obsidian Sync. See
+     `docs/slices/slice-1-vault-bookmark.md`. **T2 is ratified; the git fallback
+     (gate 3) is not needed.**
 3. If T2's on-device check fails, fall back to **T1** (iCloud, accept flakier
    sync) before considering **Git**. If Git ever becomes the path: confirm a
    **currently-maintained, SPM-installable** libgit2 Swift wrapper builds for
