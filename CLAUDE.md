@@ -78,6 +78,26 @@ Instruments happen in Xcode. Expect that context switch.
 - **Decisions:** if it's a real decision, write it down (ADR or PRD) so it
   survives across sessions and the personas don't relitigate settled ground.
 
+## Session continuity (resuming, or moving to a remote session)
+
+The **git repo is the single source of truth.** A new or remote Claude Code
+session only sees what is **committed and pushed** — Claude Code's per-project
+auto-memory (`~/.claude/projects/.../memory/`) and the conversation transcript are
+machine-local and do **not** travel.
+
+- **Resuming Jackdaw?** Read `docs/STATUS.md` first — it's the living handoff:
+  slice progress, the decision log with ADR pointers, the build/verify recipe and
+  gotchas, and the immediate next step.
+- **Travels via git:** this file, everything in `docs/` (PRD, ADRs, design,
+  build-order, slices, STATUS.md), `.claude/agent-memory/` (the personas reload
+  their state — re-invoke them; prior agent *instances* don't survive a move),
+  `.claude/agents/`, `.claude/commands/`, and all code + tests.
+- **Before switching sessions:** run `/handoff` to refresh `docs/STATUS.md`, then
+  **commit and push `main`**. Keep decisions and in-flight context out of the chat
+  and in a doc/ADR/persona-memory so nothing is lost in the move.
+- **Remote build env** needs Xcode 26.x + the iOS 26 SDK to build/verify; a sandbox
+  without Xcode can still edit code and drive the docs-based workflow.
+
 ## Owner background (for tailoring explanations)
 
 Strong full-stack engineer and ex-EM; comfortable at architecture and product
