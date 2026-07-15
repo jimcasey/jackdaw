@@ -38,6 +38,17 @@ final class Note {
     /// Times this note has been snoozed; drives the "snoozed N×" anti-graveyard hint.
     var snoozeCount: Int = 0
 
+    // --- location (Location slice) — optional → lightweight migration ---
+    // No persisted pending/denied state: `hasLocation == false` is terminal (never
+    // granted / denied / fix lost to an early kill all look the same). Keep this
+    // file free of the CoreLocation import — build a coordinate in the location layer.
+    var latitude: Double?
+    var longitude: Double?
+    var horizontalAccuracy: Double?     // metres; distinguishes precise from reduced
+    var placeName: String?              // reverse-geocoded lazily at display; nil if unresolved
+
+    var hasLocation: Bool { latitude != nil && longitude != nil }
+
     var status: NoteStatus {
         get { NoteStatus(rawValue: statusRaw) ?? .inbox }
         set { statusRaw = newValue.rawValue }

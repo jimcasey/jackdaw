@@ -27,7 +27,9 @@ final class CaptureViewModel {
         if draft == nil {
             // Rule 1: lazy create on the FIRST non-whitespace character.
             guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
-            draft = service.makeNote(body: text, in: context)
+            let note = service.makeNote(body: text, in: context)
+            service.attachLocation(to: note, in: context)   // async backfill bound to `note`
+            draft = note
         } else {
             draft?.body = text   // mutate in place; SwiftData tracks it
         }

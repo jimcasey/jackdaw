@@ -1,5 +1,7 @@
 import SwiftUI
 import SwiftData
+import MapKit
+import CoreLocation
 
 /// Light note editing, pushed onto the Triage stack (tap a row). Body editing +
 /// time editing this slice; location editing is hooked but deferred to the Location
@@ -23,7 +25,7 @@ struct NoteEditorView: View {
             }
             Section("Context") {
                 DatePicker("Captured", selection: $note.createdAt)
-                // location row — Location slice
+                LocationRow(note: note)
             }
         }
         .navigationTitle("Edit")
@@ -56,5 +58,57 @@ struct NoteEditorView: View {
     private func act(_ transition: () -> Void) {
         transition()
         dismiss()
+    }
+}
+
+/// The captured-location row: a static map thumbnail from the coordinates, a
+/// lazily-reverse-geocoded place name, and Clear. "No location" when absent.
+/// Geocoding happens at display only (capture stays offline-first).
+private struct LocationRow: View {
+    @Bindable var note: Note
+
+    var body: some View {
+        if note.hasLocation, let lat = note.latitude, let lon = note.longitude {
+            let coord = CLLocationCoordinate2D(latitude: lat, longitude: lon)
+            VStack(alignment: .leading, spacing: 8) {
+                Map(initialPosition: .region(MKCoordinateRegion(
+                    center: coord, latitudinalMeters: 500, longitudinalMeters: 500))) {
+                    Marker("", coordinate: coord)
+                }
+                .frame(height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .allowsHitTesting(false)
+                .accessibilityLabel(accessibilityText)
+
+                if let name = note.placeName {
+                    Text(name).font(.subheadline)
+                }
+                Button("Clear location", role: .destructive, action: clear)
+            }
+            .task { await geocodeIfNeeded(coord) }
+        } else {
+            Text("No location").foregroundStyle(.secondary)
+        }
+    }
+
+    private var accessibilityText: String {
+        if let name = note.placeName { return name }
+        let lat = note.latitude ?? 0, lon = note.longitude ?? 0
+        return "Location: \(lat), \(lon)"
+    }
+
+    private func clear() {
+        note.latitude = nil
+        note.longitude = nil
+        note.horizontalAccuracy = nil
+        note.placeName = nil
+    }
+
+    private func geocodeIfNeeded(_ coord: CLLocationCoordinate2D) async {
+        guard note.placeName == nil else { return }
+        let location = CLLocation(latitude: coord.latitude, longitude: coord.longitude)
+        guard let placemarks = try? await CLGeocoder().reverseGeocodeLocation(location),
+              let placemark = placemarks.first else { return }
+        note.placeName = [placemark.name, placemark.locality].compactMap { $0 }.first
     }
 }

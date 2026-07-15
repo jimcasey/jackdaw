@@ -10,7 +10,7 @@ struct CaptureView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var text = ""
-    @State private var vm = CaptureViewModel()
+    @State private var vm = CaptureViewModel(service: CaptureService(location: CoreLocationProvider.shared))
     @State private var capturedToken = 0
     @State private var showCaptured = false
     @FocusState private var focused: Bool
@@ -61,7 +61,10 @@ struct CaptureView: View {
                 }
             }
             .sensoryFeedback(.success, trigger: capturedToken)
-            .task { focused = true }
+            .task {
+                focused = true
+                CoreLocationProvider.shared.prewarm()   // warm GPS if already authorized
+            }
             .onChange(of: text) { _, newValue in
                 vm.edit(newValue, in: context)
             }
@@ -71,6 +74,7 @@ struct CaptureView: View {
             .onDisappear {
                 // Sheet dismissal is the single, deterministic "leaving" event.
                 vm.finishEditing(in: context)
+                CoreLocationProvider.shared.stopPrewarm()
             }
         }
         .presentationDragIndicator(.visible)
