@@ -1,12 +1,13 @@
 import SwiftUI
 
-/// The Capture screen: launch-to-capture with the keyboard up, a full-bleed
-/// editor, and autosave-as-you-type. No Save button — leaving Capture commits the
-/// note; the keyboard-toolbar "New note" action banks the current thought and
-/// gives a fresh field without leaving (design flow §1, Exit A/B).
+/// The Capture sheet (ADR 0004): a modal presented over the Triage root, with its
+/// own keyboard and dismissal. Autosave-as-you-type — no explicit Save. Dismissing
+/// the sheet commits the note; the keyboard-toolbar "New note" action banks the
+/// current thought and gives a fresh field without leaving.
 struct CaptureView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dismiss) private var dismiss
 
     @State private var text = ""
     @State private var vm = CaptureViewModel()
@@ -31,9 +32,9 @@ struct CaptureView: View {
                 TextEditor(text: $text)
                     .focused($focused)
                     .scrollContentBackground(.hidden)
-                    .scrollDismissesKeyboard(.interactively)
             }
             .padding(.horizontal)
+            .navigationTitle("Capture")
             .navigationBarTitleDisplayMode(.inline)
             .overlay(alignment: .top) {
                 if showCaptured {
@@ -47,13 +48,11 @@ struct CaptureView: View {
                 }
             }
             .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    // Commit + close. The note is already saved; this just leaves.
+                    Button("Done") { dismiss() }
+                }
                 ToolbarItemGroup(placement: .keyboard) {
-                    // Dismiss the keyboard so the floating tab bar is reachable —
-                    // Return inserts a newline in a TextEditor, so this is the only
-                    // way out of Capture toward Triage. The draft is already saved.
-                    Button("Done", systemImage: "keyboard.chevron.compact.down") {
-                        focused = false
-                    }
                     Spacer()
                     Button("New note", systemImage: "plus.circle.fill") {
                         captureAnother()
@@ -70,14 +69,15 @@ struct CaptureView: View {
                 if phase == .background { vm.finishEditing(in: context) }
             }
             .onDisappear {
+                // Sheet dismissal is the single, deterministic "leaving" event.
                 vm.finishEditing(in: context)
-                text = ""
             }
         }
+        .presentationDragIndicator(.visible)
     }
 
-    /// Exit B — bank the current (non-empty) note and start a fresh one without
-    /// leaving Capture. The note is already saved; this is a delimiter, not a save.
+    /// Bank the current (non-empty) note and start a fresh one without leaving the
+    /// sheet. The note is already saved; this is a delimiter, not a save.
     private func captureAnother() {
         vm.finishEditing(in: context)   // commit current row, detach draft
         text = ""                        // fresh field; next keystroke = new row
