@@ -1,15 +1,15 @@
 # ADR 0006 — Adopt Xcode Cloud for CI + TestFlight distribution
 
-> **Status:** Proposed — two phased Xcode Cloud workflows (PR CI, then TestFlight
-> distribution), owner-configured, agent never triggers or reconfigures. Three
-> open decision points below await the owner's call.
+> **Status:** Accepted (2026-07-18) — two phased Xcode Cloud workflows (PR CI, then
+> TestFlight distribution), owner-configured, agent never triggers or reconfigures.
+> The three decision points below are now **resolved** (see Decisions).
 > **Date:** 2026-07-18
 > **Owner of decision:** tech-lead (feasibility + CI/toolchain), **arbitrated and
 > ratified by owner.**
-> **Load-bearing at:** the next PR cycle — this ADR must be ratified *before* any
-> Xcode Cloud workflow is created in App Store Connect (ADR-first for real
-> decisions, per `docs/dev-workflow.md`). It makes the "Xcode Cloud (not built
-> yet)" section of that doc concrete.
+> **Load-bearing at:** now ratified — the owner may create the Xcode Cloud
+> workflows in App Store Connect (ADR-first satisfied, per `docs/dev-workflow.md`).
+> It makes the "Xcode Cloud (not built yet)" section of that doc concrete; flip
+> that section to "active" once the workflows are wired and Phase 1 is green.
 
 ## Context
 
@@ -72,12 +72,11 @@ get the pipeline green while it does the minimum, then add the pricey leg.
 - **Purpose:** the automated **correctness** gate that sits *beside* the tripod's
   **judgment** gate (`/checkpoint-review`). A green build ≈ safe to merge.
 - Prove it green on one real PR before proceeding to Phase 2.
-- *(See open question 2 — whether this becomes a required status check in branch
-  protection.)*
+- *(Decision 2: becomes a required status check in branch protection once green.)*
 
 ### Phase 2 — "TestFlight" (archive + distribute)
 
-- **Start condition:** merge to `main` (*or* a release tag — see open question 1).
+- **Start condition:** merge to `main` (Decision 1 — not tag-gated).
 - **Action:** archive + distribute to **TestFlight Internal Testing** (owner's
   device). This is the pricier run (~15–20 min wall-clock).
 - **Gating:** fires **only** on merge-to-`main` (or tag) — **never** on PRs or WIP
@@ -129,23 +128,19 @@ not a workflow-config change.
 | Add a `ci_post_clone.sh`/`ci_*` script — **only if** a custom step proves needed | Agent |
 | Later flip `docs/dev-workflow.md` Xcode Cloud section from "future" → "active" | Agent (post-ratification) |
 
-## Open decision points (Proposed — owner arbitrates)
+## Decisions (Accepted 2026-07-18 — owner ratified)
 
-1. **Distribute on every merge to `main`, or only on release tags?**
-   *Recommendation: **every merge to `main`***, during active slice development —
-   so each finished slice auto-lands on the device with zero manual steps. Revisit
-   toward release-tag-only **if** quota pressure ever appears (the numbers say it
-   won't at this cadence). Choosing tag-only now trades convenience for a margin
-   we already have.
-2. **Make PR CI a required status check in branch protection once proven green?**
-   *Recommendation: **yes**, after it is demonstrably green on a real PR.* That is
-   what upgrades it from advisory signal to an actual merge gate — `main` "always
-   builds and passes unit tests" becomes enforced, not just intended.
-3. **Internal testers only, or also external TestFlight?**
-   *Recommendation: **internal-only** for now.* Jackdaw is single-user (the owner's
-   device); internal testing needs **no Beta App Review** and delivers PR/WIP
-   builds immediately. External testing adds review latency and audience we don't
-   have. Trivial to add later if that changes.
+1. **TestFlight trigger — distribute on every merge to `main`** (not tag-gated).
+   During active slice development each finished slice auto-lands on the device
+   with zero manual steps. Revisit toward release-tag-only **only if** quota
+   pressure ever appears (the numbers say it won't at this cadence).
+2. **PR CI becomes a required status check in branch protection** — turned on
+   **once it is demonstrably green on a real PR** (Phase 1). That upgrades it from
+   advisory signal to an actual merge gate: `main` "always builds and passes unit
+   tests" becomes enforced, not just intended.
+3. **Internal testers only** (owner's device) — no external TestFlight for now.
+   Internal testing needs **no Beta App Review** and delivers PR/WIP builds
+   immediately. Trivial to add external later if that changes.
 
 ## Consequences
 
