@@ -5,7 +5,7 @@
 > does **not** follow you to another machine or a cloud session (see "What travels"
 > below). Refresh this file with `/handoff` before switching sessions.
 
-**Last updated:** 2026-07-15 (after Slice 5 — Location).
+**Last updated:** 2026-07-18 (adopted PR-based dev workflow — see `docs/dev-workflow.md`).
 
 ---
 
@@ -128,4 +128,6 @@ build-order, slices, this file), `.claude/agent-memory/`, `.claude/agents/`,
 - Local build scratch (DerivedData) — disposable.
 
 **Before switching sessions:** run `/handoff` to refresh this file, then
-**commit and push `main`** — a remote/cloud session only sees pushed commits.
+**commit and push your branch and open/update its PR** — a remote/cloud session
+only sees pushed commits, and as of 2026-07-18 changes land via PR, not direct
+pushes to `main` (see `docs/dev-workflow.md`).

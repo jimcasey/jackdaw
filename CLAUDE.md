@@ -78,6 +78,26 @@ Instruments happen in Xcode. Expect that context switch.
 - **Decisions:** if it's a real decision, write it down (ADR or PRD) so it
   survives across sessions and the personas don't relitigate settled ground.
 
+## Development workflow (PRs & reviews)
+
+Changes land via **pull request**, not direct pushes to `main`. Full process in
+`docs/dev-workflow.md`; the essentials:
+
+- **Branch → commit → `/open-pr` → `/checkpoint-review` → merge.** `main` stays
+  buildable and green; don't push to it directly.
+- **Reviews reuse the tripod**, each on its dimension — tech-lead (architecture,
+  Swift, tests), design-lead (HIG, a11y, when UI changes), product-lead (scope,
+  funnel principle) — plus the built-in `/code-review` for line-level mechanics.
+  No separate reviewer agent. Calibrate the panel to the change; reviews advise,
+  the owner decides.
+- **Recording decisions:** a real architectural decision gets its **own ADR PR
+  first** (ratify before building); persona-memory and slice specs ride **in the
+  same PR** as the code they document.
+- **Xcode Cloud (future, not built):** will build/test on PRs and distribute to
+  TestFlight on merge. Cloud minutes are a finite owner-managed quota — the agent
+  never triggers or reconfigures cloud builds; it iterates on the local simulator
+  + unit tests and stops at "push branch / open PR." Details in the workflow doc.
+
 ## Session continuity (resuming, or moving to a remote session)
 
 The **git repo is the single source of truth.** A new or remote Claude Code
@@ -93,8 +113,11 @@ machine-local and do **not** travel.
   their state — re-invoke them; prior agent *instances* don't survive a move),
   `.claude/agents/`, `.claude/commands/`, and all code + tests.
 - **Before switching sessions:** run `/handoff` to refresh `docs/STATUS.md`, then
-  **commit and push `main`**. Keep decisions and in-flight context out of the chat
-  and in a doc/ADR/persona-memory so nothing is lost in the move.
+  **commit and push your branch** (and open/update its PR — see
+  `docs/dev-workflow.md`). A remote session only sees pushed commits; unmerged
+  work must be on a pushed branch, not stranded locally. Keep decisions and
+  in-flight context out of the chat and in a doc/ADR/persona-memory so nothing is
+  lost in the move.
 - **Remote build env** needs Xcode 26.x + the iOS 26 SDK to build/verify; a sandbox
   without Xcode can still edit code and drive the docs-based workflow.
 
