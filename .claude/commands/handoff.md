@@ -34,6 +34,8 @@ Do the following:
 4. **Report to the owner**, do NOT auto-commit or auto-push:
    - Confirm STATUS.md is refreshed and what changed.
    - List any uncommitted changes and any unpushed commits.
-   - Remind the owner to **commit and push `main`** (a remote session only sees
-     pushed commits), and that the build environment on the far side needs
-     **Xcode 26.x + the iOS 26 SDK** to build/verify.
+   - Remind the owner to **commit and push the working branch, then open/update
+     its PR** (a remote session only sees pushed commits; changes land via PR, not
+     direct pushes to `main` — see `docs/dev-workflow.md`), and that the build
+     environment on the far side needs **Xcode 26.x + the iOS 26 SDK** to
+     build/verify.
