@@ -35,10 +35,13 @@ Xcode), so confirm it before relying on it:
    ```
    DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
      -scheme Jackdaw -destination 'platform=iOS Simulator,name=iPhone 17' \
-     -only-testing:JackdawTests -derivedDataPath <scratch>
+     -only-testing:JackdawTests -derivedDataPath /tmp/jackdaw-derived
    ```
-   (Same recipe as `docs/STATUS.md`. `-only-testing:JackdawTests` mirrors what the
-   scheme's Test action already scopes to.)
+   (Same recipe as `docs/STATUS.md`, with `-derivedDataPath` shown as a concrete
+   path — use any throwaway dir. Don't type a literal `<placeholder>`: in zsh the
+   `<`/`>` are redirects and you'll get `parse error near '\n'`. If `iPhone 17`
+   isn't installed, pick one from `xcrun simctl list devices available`.
+   `-only-testing:JackdawTests` mirrors what the scheme's Test action scopes to.)
 4. If Xcode offers to "upgrade" the scheme, accept and commit the diff — that just
    normalizes the hand-authored XML to Xcode's exact format.
 
