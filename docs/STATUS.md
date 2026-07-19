@@ -75,6 +75,11 @@ Full scope in `docs/prd/mvp-scope.md`. Governing principle: **funnel, not archiv
 notes flow Capture → Triage → Export and leave; "home is never a growing browsable
 library." No browsing/search/history of exported notes.
 
+**Open/deferred:** the **marketable name is still TBD** (not decided). "Jackdaw" is
+taken on the App Store, so the store display name is a placeholder **"JackdawNotes"**;
+the codename `Jackdaw` and bundle ID `com.jimcodes.Jackdaw` are unaffected. Revisit
+near release — a product-lead call. See `.claude/agent-memory/product-lead/project_marketable-name.md`.
+
 ---
 
 ## How to build & verify (learned the hard way)
