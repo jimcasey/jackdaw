@@ -52,9 +52,16 @@ commit. Overwriting the committed file is fine.
 
 ## Step 1 — Create the "PR CI" workflow (Phase 1)
 
-In Xcode: **Product ▸ Xcode Cloud ▸ Create Workflow** (or App Store Connect ▸ your
-app ▸ Xcode Cloud). On first run it will prompt you to **grant access to the
-GitHub repo** (installs Apple's GitHub app on `jimcasey/jackdaw`) — approve it.
+In Xcode, open the **Report navigator** (rightmost icon in the left navigator
+strip, or **⌘9**), click the **Cloud** tab at the top, then **Get Started**.
+(It is *not* under the Product menu.) Pick **Jackdaw** in the "Select a Product"
+sheet → Next. On first run it will prompt you to **grant access to the GitHub
+repo** (installs Apple's GitHub app on `jimcasey/jackdaw`) — approve it.
+
+> If there's no **Cloud** tab / **Get Started** does nothing, it's account
+> eligibility, not a UI quirk: in **Xcode ▸ Settings ▸ Accounts** confirm you're
+> signed in with the Apple ID that is the **Account Holder** (or Admin) of an
+> **active** Apple Developer Program membership.
 
 Configure the workflow:
 
