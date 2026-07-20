@@ -69,11 +69,16 @@ easy destination before Slice 7 wires the real Obsidian folder-write. Retention 
 | Snooze | Calendar-day boundary = session boundary; reappears next local day | `docs/slices/slice-4-triage.md`, `SnoozeSchedule.swift` |
 | Discard | Deferred hard-delete + undo banner (kill-safe toward keep) | `docs/slices/slice-4-triage.md` |
 | Location | Precise GPS, in-app only; priming sheet kept, reduced-accuracy nudge cut, place names lazy-at-display | `docs/slices/slice-5-location.md` |
-| CI / distribution | **Xcode Cloud** (Accepted) — 2 phased owner-configured workflows: PR CI (build + `JackdawTests` on PR-to-`main`) + TestFlight on merge-to-`main`; internal testers only; agent never triggers/reconfigures cloud builds. **Not wired yet** — owner sets up in App Store Connect. | ADR 0006 |
+| CI / distribution | **Xcode Cloud** (Accepted) — 2 phased owner-configured workflows: PR CI (build + `JackdawTests` on PR-to-`main`) + TestFlight on merge-to-`main`; internal testers only; agent never triggers/reconfigures cloud builds. **Phase 1 repo prep done** (shared `Jackdaw` scheme, unit-tests-only; no `ci_scripts/` needed). **Cloud not wired yet** — owner follows `docs/ci/xcode-cloud-setup.md`. | ADR 0006, `docs/ci/xcode-cloud-setup.md` |
 
 Full scope in `docs/prd/mvp-scope.md`. Governing principle: **funnel, not archive** —
 notes flow Capture → Triage → Export and leave; "home is never a growing browsable
 library." No browsing/search/history of exported notes.
+
+**Open/deferred:** the **marketable name is still TBD** (not decided). "Jackdaw" is
+taken on the App Store, so the store display name is a placeholder **"JackdawNotes"**;
+the codename `Jackdaw` and bundle ID `com.jimcodes.Jackdaw` are unaffected. Revisit
+near release — a product-lead call. See `.claude/agent-memory/product-lead/project_marketable-name.md`.
 
 ---
 
