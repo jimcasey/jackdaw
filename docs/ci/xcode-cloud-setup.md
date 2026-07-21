@@ -95,6 +95,64 @@ passes unit tests" becomes enforced.
 
 Tell the agent, and it will flip the **Xcode Cloud** section of
 `docs/dev-workflow.md` from "future" → "active" with the real trigger config (its
-own small PR). **Phase 2** (TestFlight on merge-to-`main`) is a second workflow
-that reuses this same `Jackdaw` scheme's Archive action — set up separately when
-you're ready.
+own small PR).
+
+---
+
+# Phase 2 — TestFlight on merge to `main`
+
+A **second** Xcode Cloud workflow that archives on merge to `main` and
+distributes to your device via TestFlight Internal Testing (ADR 0006, Decision 1:
+every merge, not tag-gated). It reuses the same shared **`Jackdaw`** scheme — its
+Archive action is already Release.
+
+> **Guardrail:** this is the pricier run (~15–20 min: build + archive + upload).
+> It fires **only on merge to `main`**, never on PRs or WIP branches.
+
+## Repo-side prep (agent-side, done — landed with this doc)
+
+- **`ci_scripts/ci_post_clone.sh`** — sets the build number (`CFBundleVersion`)
+  to the Xcode Cloud build number so each TestFlight upload is unique; a static
+  build number collides on the second archive. Runs only in the cloud checkout.
+- **`INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO`** on the app target — the
+  app uses only exempt encryption (HTTPS/system), so this declares export
+  compliance up front and TestFlight won't block each build asking about it.
+  *(If Jackdaw ever adds non-exempt cryptography, revisit this.)*
+- **Signing:** nothing to do — the project is `CODE_SIGN_STYLE = Automatic` with a
+  team set, and Xcode Cloud's **cloud-managed signing** creates the distribution
+  certificate/profile at build time. This is the part that's normally painful for
+  a new iOS dev, and Xcode Cloud just handles it.
+
+## Step 1 — Create the "TestFlight" workflow
+
+Same entry point as Phase 1 (Report navigator ▸ **Cloud** ▸ manage workflows ▸
+add a workflow). Configure:
+
+- **Name:** `TestFlight`
+- **Start Condition:** **Branch Changes → `main`** (this is the merge-to-`main`
+  trigger). Remove any PR condition — that's Phase 1's job.
+- **Environment:** same pinned Xcode 26.x.
+- **Actions:** an **Archive** action — scheme **Jackdaw**, and set the
+  distribution/deployment to **TestFlight (Internal Testing)**.
+- **Post-Actions / Deploy:** **TestFlight Internal Testing**.
+
+## Step 2 — Confirm the internal testing group
+
+In **App Store Connect ▸ your app ▸ TestFlight**, make sure there's an **Internal
+Testing** group with **you (your device)** as a tester. Internal testing needs no
+Beta App Review, so builds land in minutes. (A group likely already exists from
+the Slice 0 TestFlight run.)
+
+## Step 3 — Trigger and verify
+
+Merge any PR to `main` (Phase 1's `PR CI` gates it first). The `TestFlight`
+workflow archives, uploads, and the build appears in TestFlight; install it on
+your device from the TestFlight app.
+
+## Gotcha — first-upload build number
+
+Slice 0 already uploaded a manual build under version **1.0**. If the first
+Xcode-Cloud build number happens to collide with (or be lower than) that manual
+build, App Store Connect rejects it. If that happens, bump **`MARKETING_VERSION`**
+(e.g. `1.0` → `1.0.1`) in the app target and merge — a new version train sidesteps
+any build-number overlap. This is a one-time nuisance, not a recurring one.
