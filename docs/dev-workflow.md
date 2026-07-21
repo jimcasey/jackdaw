@@ -125,30 +125,38 @@ Quick reference:
 
 ---
 
-## Xcode Cloud (not built yet — how it will fit)
+## Xcode Cloud (active)
 
-Not in scope for the PR-workflow change; captured here so the shape is agreed
-before we wire it. Xcode Cloud is Apple's CI: it builds, tests, and can
-auto-distribute to TestFlight on git triggers configured in App Store Connect.
-When we adopt it (its own ADR + slice), it fits the PR process as **two distinct
-gates**:
+Live since ADR 0006 (Accepted). Xcode Cloud is Apple's CI: it builds, tests, and
+distributes to TestFlight on git triggers configured in App Store Connect. Two
+workflows, each a distinct gate. Full setup + owner runbook:
+`docs/ci/xcode-cloud-setup.md`.
 
-- **On PRs to `main`:** build + run unit tests. An automated *correctness* gate
-  that complements the tripod's *judgment* review. Green build ≈ safe to merge.
-- **On merge to `main`** (or a `release/*` tag): archive and distribute to
-  TestFlight. The expensive device build runs only at real checkpoints.
+- **`PR CI` — on Pull Request → `main`:** builds the `Jackdaw` scheme and runs
+  **`JackdawTests`** (unit only — the scheme's Test action excludes UI tests).
+  ~3 min. It is a **required status check** on `main`, so it's an automated
+  *correctness* gate beside the tripod's *judgment* review — no PR merges red.
+- **`TestFlight` — on merge to `main`:** archives (Release) and distributes to
+  **TestFlight Internal Testing** (owner's device). Every merge (ADR 0006
+  Decision 1), ~15–20 min. Cloud-managed signing handles the distribution cert.
+
+**Repo pieces that make this work** (all landed via PR): the shared `Jackdaw`
+scheme (`.xcscheme`, Test action = `JackdawTests` only), `ci_scripts/ci_post_clone.sh`
+(stamps a unique build number so TestFlight uploads don't collide),
+`INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO` (export compliance), and the
+app icon. No `ci_scripts` beyond the build-number step — the project has no
+external dependencies to resolve.
 
 ### Guardrails against overusing cloud build minutes
 
-Cloud compute is a **finite, owner-managed quota** (App Store Connect plan). To
-keep the agent from burning it:
+Cloud compute is a **finite, owner-managed quota** (25 compute-hours/month free;
+real usage ≈ a few hours). To keep the agent from burning it:
 
 - **The agent never triggers cloud builds directly.** They are a consequence of
-  git events *the owner configures* in App Store Connect — the agent's job ends
-  at "push branch / open PR." There is no agent action that spends a build
-  minute.
-- **Don't wire cloud triggers to WIP branches.** Only PR-to-`main` and
-  merge-to-`main` (or release tags). WIP pushes on a feature branch cost nothing.
+  git events *the owner configured* in App Store Connect — the agent's job ends
+  at "push branch / open PR." There is no agent action that spends a build minute.
+- **Triggers never match WIP branches.** Only PR-to-`main` (`PR CI`) and
+  merge-to-`main` (`TestFlight`). WIP pushes on `claude/*` / `slice-*` cost nothing.
 - **The agent keeps iterating locally** — simulator build + unit tests, exactly
   as today. Cloud is for the device/TestFlight path the simulator can't cover,
   not the inner loop.
