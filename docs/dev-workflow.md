@@ -64,6 +64,40 @@ branch  →  commit work  →  /open-pr  →  /checkpoint-review  →  address f
 
 ---
 
+## Agent PR automation (owner-directed 2026-07-21)
+
+Standing rules for how the agent drives the PR half of the loop, so the owner
+isn't the bottleneck on ceremony. These **override** the agent's default "don't
+open a PR unless asked" posture for this repo.
+
+1. **Open the PR automatically — don't wait for owner input.** Once a change on a
+   branch is coherent (work committed and pushed), the agent opens the PR against
+   `main` itself (description from the diff + linked slice/ADR, honoring any PR
+   template — i.e. `/open-pr`). Opening early / as draft is fine.
+
+2. **Watch `PR CI` on a ~20-minute budget, then act on the color.** After opening
+   (or after any push to the branch), the agent checks the PR's status, waiting up
+   to ~20 minutes for a terminal result, and follows this decision flow:
+
+   | CI color | Meaning | Agent action |
+   |----------|---------|--------------|
+   | 🟢 **Green** | Required checks passed | **Stop** — do **not** re-arm the check. Hand back to the owner for the next action (`/checkpoint-review`, merge). |
+   | 🟡 **Yellow** | Still running / pending, or the ~20-min budget elapsed with no terminal result | **Re-arm** the check and keep waiting. |
+   | 🔴 **Red** | A required check failed | **Attempt to fix** — diagnose from the logs, push a fix to the branch (which restarts the cycle at step 2). If the failure is out of scope or resists a fix, report the diagnosis and where it's stuck. |
+
+   "Green → wait for input" is deliberate: CI passing is a *correctness* gate, not
+   a merge decision. Merge and the checkpoint review stay the **owner's call** (the
+   owner arbitrates) — the agent stops babysitting and hands back, rather than
+   re-polling a PR that has nothing left to watch.
+
+3. **This does not change the cloud-spend guardrails below.** The agent still never
+   *triggers* or reconfigures Xcode Cloud; CI runs are a consequence of the
+   owner-configured PR/merge triggers. Auto-opening a PR is the one git event the
+   agent now performs without asking — it costs the one `PR CI` run that a PR was
+   always going to cost.
+
+---
+
 ## Checkpoint review — who reviews what
 
 We **do not** use a separate generic reviewer agent. Reviews reuse the tripod,
