@@ -32,8 +32,8 @@ with **tripod checkpoint reviews**, and a **live Xcode Cloud CI/CD pipeline**
 | 3 | Capture rework → Triage-root + auto-presented Capture **sheet** | ✅ done |
 | 4 | Real Triage inbox (Keep/Snooze/Discard, undo, editor) | ✅ done |
 | 5 | Location context (in-app precise GPS, async backfill) | ✅ done |
-| 6 | **Apple Notes export** (intermediate milestone) | ▶ **implemented on branch `claude/slice-5-ftbwen`, pending build/verify** |
-| 7 | Obsidian export → v1 complete | not started |
+| 6 | **Apple Notes export** (intermediate milestone) | ✅ **merged (#9), PR CI green; tech-lead-review follow-ups (launch reconciliation, Obsidian-fold tests, save-safety) in a follow-up PR** |
+| 7 | Obsidian export → v1 complete | ▶ **NEXT — not started** |
 
 **Numbering caveat:** implementation slice numbers run **one ahead** of the
 at-a-glance table in `docs/build-order.md` (the capture rework became its own
@@ -43,45 +43,40 @@ files are the detailed specs.
 ### What's built vs. not
 - **Built:** capture (autosave-as-you-type, sheet), Triage inbox with the three
   actions + deferred-delete undo + calendar-day snooze + light editing, location
-  attachment. **33 unit tests** as of last merge to `main`.
-- **New on `claude/slice-5-ftbwen` (Slice 6 — Apple Notes export, unbuilt here):**
-  the export half above the seam is now written —
-  - `Talon/NoteSerializer.swift` (markdown + YAML frontmatter; reused by Obsidian),
-  - `Talon/RetentionMachine.swift` (pure `kept → pending → writing → confirmed →
-    deleted`; delete only on confirm),
-  - `Talon/ExportCoordinator.swift` (drives notes through the machine against an
-    `ExportDestination`),
-  - `Talon/AppleNotesDestination.swift` (share-sheet adapter; **degraded** confirm),
-  - the `ExportDestination` seam evolved to **batch / async / per-note outcome**
-    (`SerializedNote`, `ExportOutcome`; `ExportFailure` now `String`-backed),
-  - `Note` gained `pending/writing/confirmed` statuses + `exportFailureRaw`,
-  - `TriageRootView` gained the outbox count + "Export N to Notes" batch action,
-  - `JackdawTests/ExportTests.swift` (serializer / machine / coordinator).
-  **Not yet compiled or run** (sandbox has no Xcode) — `PR CI` / the local recipe is
-  the gate.
+  attachment.
+- **Slice 6 — Apple Notes export — MERGED (#9), PR CI green.** The export half above
+  the seam is live: `NoteSerializer` (markdown + YAML frontmatter; reused by Obsidian),
+  `RetentionMachine` (pure `kept → pending → writing → confirmed → deleted`; delete
+  only on confirm) + `ExportCoordinator`, `AppleNotesDestination` (share-sheet;
+  **degraded** confirm), the `ExportDestination` seam evolved to **batch / async /
+  per-note outcome**, `Note` gained `pending/writing/confirmed` + `exportFailureRaw`,
+  and Triage gained the outbox count + "Export N to Notes". Off-device suite in
+  `JackdawTests/ExportTests.swift`. **A tech-lead-review follow-up PR adds:** launch
+  `writing → pending` reconciliation (`ExportReconciler`), off-device tests for
+  `ObsidianFolderDestination.writeBatch` (Slice 7's real path), and do/`catch` on the
+  kill-safety save.
 - **Reused from Slice 1 (unchanged logic):** `VaultAccess`, `FolderWriter`,
-  `VaultBookmarkStore` — `ObsidianFolderDestination` was updated to the new seam
-  (still wraps `FolderWriter` write+verify) and is Slice 7's real destination; the
+  `VaultBookmarkStore` — `ObsidianFolderDestination` now conforms to the new seam
+  (still wraps `FolderWriter` write+verify) and is **Slice 7's real destination**; the
   `VaultProofView` harness stays parked/throwaway.
 
 ### Immediate next step
-**Slice 6 — Apple Notes export is implemented** on branch `claude/slice-5-ftbwen`
-(spec: `docs/slices/slice-6-apple-notes-export.md`) but was authored in a **sandbox
-with no Xcode**, so it is **not yet compiled or tested here.** Next:
-1. **Build + run `JackdawTests`** with the recipe below (or let `PR CI` do it) — the
-   new off-device suite is `JackdawTests/ExportTests.swift` (serializer, retention
-   machine, coordinator). Expect the total to rise from 33.
-2. **On-device/sim verify** the two device-only pieces: the batch "Export N to Notes"
-   share sheet from Triage, and a frontmatter'd note landing in Apple Notes (§7 of
-   the spec).
-3. Open the PR for `claude/slice-5-ftbwen` → `PR CI` + `/checkpoint-review` → merge →
-   automatic TestFlight. **This is the first *feature* slice through the new flow.**
+Slice 6 (Apple Notes export) is **merged and CI-green**; a tech-lead-review follow-up
+PR is in flight (launch reconciliation + Obsidian-fold tests + save-safety). On-device
+smoke check still owed (batch "Export N to Notes" share sheet; a frontmatter'd note
+landing in Apple Notes) — but time-box it: Apple Notes is throwaway scaffolding.
 
-Then **Slice 7 — Obsidian export**: swap `AppleNotesDestination` → an
-`ObsidianDestination` behind the *same* `ExportCoordinator`; reuse the serializer +
-retention machine **verbatim** and the Slice-1 `VaultAccess`/`FolderWriter`
-write+verify; add lazy vault setup, stale-bookmark re-grant, and the pending/failed
-surfacing UI (this slice only *stores* the reason).
+**Then Slice 7 — Obsidian export** (v1 feature-complete): swap `AppleNotesDestination`
+→ an `ObsidianDestination` behind the *same* `ExportCoordinator`; reuse the serializer
++ retention machine + `ObsidianFolderDestination.writeBatch` **verbatim** (all now
+tested). Its **entry checklist** (from the PR #9 checkpoint review + the follow-up):
+lazy vault setup at first Keep; stale-bookmark re-grant (`accessLost` → Re-grant); the
+pending/failed **surfacing** UI (this slice only *stores* the reason) — recorded as
+**act-on-stuck-notes only, never a browsable list** (product-lead non-goal); export
+affordance on the **trailing/bottom** bar, not the leading slot (design-lead);
+failure/cancel must **announce (VoiceOver) + surface visibly**; give a share-sheet
+cancel a distinct non-error reason; and decide **auto-export-on-Keep vs. manual
+flush** for Obsidian's silent write.
 
 ### Recently landed
 **PRs #1–#7 are all merged to `main`** — the PR-based workflow, the tripod-review

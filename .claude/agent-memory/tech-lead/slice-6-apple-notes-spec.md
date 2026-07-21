@@ -44,8 +44,11 @@ per note) — **reuses `VaultAccess`/`FolderWriter` verbatim**, so Slice 7 inher
 - **Degraded confirm:** share-sheet *completion* = `confirmed` (it can't prove Notes
   saved). Fine — this milestone exists to exercise the pipeline/seam, not to be a
   trustworthy retention path. Obsidian (Slice 7) is the verifiable one (read-back).
-- **No reconciliation of a killed `writing` note** — the share sheet has no receipt.
-  Add startup `writing→pending` reconciliation on the Obsidian path (Slice 7).
+- ~~No reconciliation of a killed `writing` note~~ **— FIXED (post-merge follow-up).**
+  `ExportReconciler.reconcileInterruptedWrites` runs once at launch (`RootView.task`)
+  and requeues `writing → pending(nil)` via the new machine `.interrupt` transition.
+  Same follow-up: `ObsidianFolderDestination.writeBatch` split out + tested off-device;
+  pre-write `save()` is do/`catch`+rollback, not `try?`; shared `Note.setRetention`.
 - Obsidian file I/O currently runs on `@MainActor` via the seam — acceptable now;
   offload if Slice 7 profiling says so.
 
