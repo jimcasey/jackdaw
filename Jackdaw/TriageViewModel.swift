@@ -64,7 +64,8 @@ final class TriageViewModel {
             switch note.status {
             case .inbox:   return true
             case .snoozed: return note.snoozedUntil.map { SnoozeSchedule.isDue(snoozedUntil: $0, now: n) } ?? true
-            case .kept:    return false
+            // kept + the export-tail states (pending/writing/confirmed) have left triage.
+            case .kept, .pending, .writing, .confirmed: return false
             }
         }
     }

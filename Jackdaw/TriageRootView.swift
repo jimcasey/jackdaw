@@ -15,9 +15,17 @@ struct TriageRootView: View {
            sort: \Note.createdAt, order: .reverse)
     private var candidates: [Note]
 
+    // The export "outbox": kept notes plus any whose last export attempt failed
+    // (pending). String literals mirror NoteStatus.kept/.pending rawValues
+    // (asserted in NoteStatusRawTests). Drives the batch-export affordance + count.
+    @Query(filter: #Predicate<Note> { $0.statusRaw == "kept" || $0.statusRaw == "pending" },
+           sort: \Note.createdAt, order: .reverse)
+    private var outbox: [Note]
+
     @State private var vm = TriageViewModel()
     @State private var bannerNoteID: UUID?
     @State private var discardTask: Task<Void, Never>?
+    @State private var isExporting = false
     @State private var refreshToken = 0   // bumped on appear/active to recompute due-ness
 
     private var visible: [Note] { vm.visibleNotes(candidates) }
@@ -49,6 +57,16 @@ struct TriageRootView: View {
         }
         .overlay { if visible.isEmpty { emptyState } }
         .navigationTitle("Triage (\(visible.count))")
+        .toolbar {
+            if !outbox.isEmpty {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(action: exportKept) {
+                        Label("Export \(outbox.count) to Notes", systemImage: "square.and.arrow.up")
+                    }
+                    .disabled(isExporting)
+                }
+            }
+        }
         .navigationDestination(for: Note.self) { note in
             NoteEditorView(note: note,
                            onKeep: { keep($0) },
@@ -112,6 +130,24 @@ struct TriageRootView: View {
 
     private func keep(_ note: Note) { vm.keep(note, in: context) }
     private func snooze(_ note: Note) { vm.snooze(note, in: context) }
+
+    /// Batch-export the outbox (Kept + failed-pending) in one action, via the Apple
+    /// Notes share sheet (Slice 5 intermediate destination). Confirmed notes leave
+    /// the app; any that fail stay in the outbox (their count persists — honest).
+    private func exportKept() {
+        guard !isExporting else { return }
+        finalizePendingDiscard()      // don't strand a mid-flight discard behind the sheet
+        isExporting = true
+        Task {
+            let coordinator = ExportCoordinator(destination: AppleNotesDestination())
+            let confirmed = await coordinator.exportAll(in: context)
+            isExporting = false
+            if confirmed > 0 {
+                let noun = confirmed == 1 ? "note" : "notes"
+                AccessibilityNotification.Announcement("Exported \(confirmed) \(noun).").post()
+            }
+        }
+    }
 
     private func discard(_ note: Note) {
         finalizePendingDiscard()          // commit any prior pending immediately
