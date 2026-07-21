@@ -13,6 +13,12 @@ enum NoteStatus: String, Codable, CaseIterable {
     case pending    // in the export queue / a prior attempt failed (see exportFailure)
     case writing    // an export attempt is in flight
     case confirmed  // write confirmed; about to be deleted (transient)
+
+    /// The "outbox": notes eligible for an export run — kept for export, or a prior
+    /// attempt to retry. The single source of truth the outbox `@Query` string
+    /// literals mirror (asserted consistent in `NoteExportFieldsTests`). `writing`/
+    /// `confirmed` are deliberately excluded — an in-flight note is not re-enqueued.
+    static let exportable: Set<NoteStatus> = [.kept, .pending]
 }
 
 /// A captured note.

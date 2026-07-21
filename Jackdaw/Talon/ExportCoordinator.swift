@@ -24,10 +24,15 @@ struct ExportCoordinator {
         await export(exportable(in: context), in: context)
     }
 
-    /// Export a specific set of notes. Notes not currently `kept`/`pending` are left
-    /// to the machine's no-op transitions, so passing a stray note can't corrupt it.
+    /// Export a specific set of notes. Only `kept`/`pending` notes are eligible;
+    /// anything else is filtered out **before** the machine runs. This guard is
+    /// load-bearing, not defensive nicety: `Note.retentionState` maps `inbox`/
+    /// `snoozed` to `.kept`, so without it a stray un-triaged note would advance
+    /// `writing → deleted` and a capture would be destroyed — the opposite of the
+    /// funnel's kill-safe-toward-keep rule.
     @discardableResult
     func export(_ notes: [Note], in context: ModelContext) async -> Int {
+        let notes = notes.filter { NoteStatus.exportable.contains($0.status) }
         guard !notes.isEmpty else { return 0 }
 
         // 1. kept/pending → writing, and persist that intent before the (possibly

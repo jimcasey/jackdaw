@@ -234,6 +234,14 @@ re-grant; per-note failure **surfacing** UI (Retry / Re-grant / Set-up) — this
 only *stores* the reason; startup reconciliation of a killed `writing` note; possibly
 offloading Obsidian file I/O off the main actor.
 
+**Noted by tech-lead review (fold in when the surfacing UI lands, Slice 7):**
+- A share-sheet **cancel** currently persists `pending(.writeFailed)` — no note is
+  lost, but "write failed / Retry" misreads a plain cancel. Give cancel a distinct
+  non-error signal (a `cancelled` reason or `pending(nil)`) once the reason is shown.
+- `AppleNotesDestination` joins the whole batch into **one** Apple Note (its `---`
+  separators collide with each note's frontmatter fences). Device-only, acceptable
+  for throwaway scaffolding; don't be surprised by it in the on-device check.
+
 ## Related
 - Export decision + verification gates: `docs/adr/0001-obsidian-write-mechanism.md`
 - Seam + write/verify (reused): `Jackdaw/Talon/{ExportDestination,VaultAccess,FolderWriter}.swift`

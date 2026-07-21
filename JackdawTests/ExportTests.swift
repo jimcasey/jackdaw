@@ -261,14 +261,36 @@ struct ExportCoordinatorTests {
         #expect(payload.markdown.contains("latitude: 51.500000"))
     }
 
-    @Test func exportableCount_countsKeptAndPendingOnly() async throws {
+    @Test func exportableCount_countsKeptAndPending_excludesEverythingElse() async throws {
         let context = try makeContext()
         keptNote("k", in: context)
         let p = Note(body: "p"); p.status = .pending; context.insert(p)
-        let i = Note(body: "i"); context.insert(i)             // inbox — excluded
+        let i = Note(body: "i"); context.insert(i)                 // inbox — excluded
+        let s = Note(body: "s"); s.status = .snoozed; context.insert(s)   // excluded
+        // In-flight / interrupted notes must be invisible to a fresh export run.
+        let w = Note(body: "w"); w.status = .writing; context.insert(w)   // excluded
+        let c = Note(body: "c"); c.status = .confirmed; context.insert(c) // excluded
         try context.save()
 
         let count = ExportCoordinator(destination: MockDestination()).exportableCount(in: context)
         #expect(count == 2)
+    }
+
+    /// The kill-safe guard: `export(_:)` must NOT advance/delete a stray un-triaged
+    /// note, even though `Note.retentionState` maps inbox/snoozed → `.kept`.
+    @Test func export_directCall_ignoresNonExportableNotes_neverDeletes() async throws {
+        let context = try makeContext()
+        let inbox = Note(body: "inbox"); context.insert(inbox)
+        let snoozed = Note(body: "snoozed"); snoozed.status = .snoozed; context.insert(snoozed)
+        try context.save()
+
+        let mock = MockDestination()   // would confirm (→ delete) anything it received
+        let confirmed = await ExportCoordinator(destination: mock).export([inbox, snoozed], in: context)
+
+        #expect(confirmed == 0)
+        #expect(mock.received.isEmpty)        // never even serialized
+        #expect(try count(context) == 2)      // both captures survive intact
+        #expect(inbox.status == .inbox)
+        #expect(snoozed.status == .snoozed)
     }
 }
