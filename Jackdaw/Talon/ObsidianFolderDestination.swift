@@ -18,25 +18,32 @@ struct ObsidianFolderDestination: ExportDestination {
     func export(_ notes: [SerializedNote]) async -> [ExportOutcome] {
         guard !notes.isEmpty else { return [] }
         do {
-            return try access.withVaultURL { url in
-                notes.map { note in
-                    do {
-                        try writer.writeAndVerify(fileName: note.fileName,
-                                                  data: Data(note.markdown.utf8),
-                                                  into: url)
-                        return .confirmed(id: note.id)
-                    } catch let failure as ExportFailure {
-                        return .failed(id: note.id, reason: failure)
-                    } catch {
-                        return .failed(id: note.id, reason: .writeFailed)
-                    }
-                }
-            }
+            return try access.withVaultURL { url in writeBatch(notes, into: url) }
         } catch let failure as ExportFailure {
             // Vault-level failure (noVaultConfigured / accessLost) fails the whole batch.
             return notes.map { .failed(id: $0.id, reason: failure) }
         } catch {
             return notes.map { .failed(id: $0.id, reason: .writeFailed) }
+        }
+    }
+
+    /// The per-note write+verify fold, split from the security-scope layer so it is
+    /// unit-testable against a plain temp directory (no bookmark, no
+    /// `startAccessingSecurityScopedResource`). A single bad note fails only itself;
+    /// the rest still land. **Reused verbatim by Slice 7** — it is the trustworthy
+    /// write path, so it's the part that most earns coverage.
+    func writeBatch(_ notes: [SerializedNote], into folder: URL) -> [ExportOutcome] {
+        notes.map { note in
+            do {
+                try writer.writeAndVerify(fileName: note.fileName,
+                                          data: Data(note.markdown.utf8),
+                                          into: folder)
+                return .confirmed(id: note.id)
+            } catch let failure as ExportFailure {
+                return .failed(id: note.id, reason: failure)
+            } catch {
+                return .failed(id: note.id, reason: .writeFailed)
+            }
         }
     }
 }

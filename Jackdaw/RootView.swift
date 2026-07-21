@@ -4,6 +4,8 @@ import SwiftUI
 /// auto-presents on launch.** After the first capture, if location hasn't been
 /// asked for yet, a one-time priming sheet explains why before the system prompt.
 struct RootView: View {
+    @Environment(\.modelContext) private var context
+
     /// Single source of truth for auto-present-on-launch. Post-v1, once external
     /// capture seeds the inbox (ADR 0005 fast-follow), flip the initial value to
     /// `false` so the app opens to a bare Triage root.
@@ -27,6 +29,9 @@ struct RootView: View {
         .sheet(isPresented: $showPriming) {
             LocationPrimingSheet()
         }
+        // Recover any note stranded mid-export by a prior app kill (writing → pending),
+        // so it re-surfaces in the outbox instead of being invisible everywhere.
+        .task { ExportReconciler.reconcileInterruptedWrites(in: context) }
     }
 
     /// Once-only, after the first Capture session ends and before any system

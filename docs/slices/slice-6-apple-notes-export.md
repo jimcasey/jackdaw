@@ -160,11 +160,20 @@ plus `exportFailureRaw`, exposed as `note.retentionState`.
 
 `exportableCount(in:)` backs the outbox badge.
 
-> **Transient-state note (accepted for this milestone):** `.writing`/`.confirmed` are
-> persisted for a beat. A kill mid-`writing` (Apple Notes) can't be reconciled (the
-> share sheet has no receipt), so on next launch such a note simply sits in the
-> outbox as… nothing visible — **known gap, acceptable for scaffolding.** Slice 7
-> adds startup reconciliation (`writing`→`pending`) on the verifiable Obsidian path.
+The pre-write `save()` is do/`catch`, not `try?`: if it fails, the kill-safety
+guarantee is void, so the coordinator rolls back the `.writing` marks (leaving the
+notes `.kept` and exportable) and aborts rather than exporting un-persisted notes.
+
+> **Transient states — now reconciled at launch (follow-up to the original slice).**
+> Only `.writing` can survive a kill: `.confirmed` never does, because confirm →
+> commit → delete all happen inside one `save()`, so a `.confirmed` row is gone in the
+> same transaction it appears. A note killed mid-`writing` (the Apple Notes share sheet
+> can sit open indefinitely) would otherwise be **invisible on every surface** —
+> excluded from the outbox (`kept||pending`) *and* Triage (`inbox||snoozed`), not
+> merely "invisible in the outbox." `ExportReconciler.reconcileInterruptedWrites`,
+> called once from `RootView` at launch, requeues any such note `writing → pending(nil)`
+> (the machine's `.interrupt` transition — a reason-less recovery, not a failure) so it
+> reappears in the outbox. Reused by Slice 7 on the verifiable Obsidian path.
 
 ---
 
@@ -209,6 +218,13 @@ scaffolding; Obsidian (Slice 7) is the verifiable path** (write-then-read-back).
   outbox is a no-op; body+location reach the serialized payload; `exportableCount`.
 - **`Note`:** new status rawValues match the `@Query` literals; `exportFailure`
   round-trips through `exportFailureRaw`; `retentionState` maps from status.
+- **Reconciler** (post-merge follow-up): a `.writing` note is requeued `→ pending`
+  (reason-less) while others are untouched; idempotent. Machine `.interrupt`:
+  `writing → pending(nil)`. Coordinator ordering: notes are persisted `.writing`
+  **before** the destination is awaited.
+- **`ObsidianFolderDestination`** (Slice 7's real path, off-device): `writeBatch`
+  all-success and one-bad-filename partial (temp dir + real `FolderWriter`);
+  no-vault → whole batch `.failed(.noVaultConfigured)`.
 
 **Needs the simulator / device (owner checks):**
 - The **share sheet** actually presents from Triage; picking Notes creates a note;
@@ -229,12 +245,18 @@ scaffolding; Obsidian (Slice 7) is the verifiable path** (write-then-read-back).
    this slice ships. Slice 7 swaps `AppleNotesDestination` → `ObsidianDestination`
    behind the same coordinator, unchanged.
 
-**Deferred to Slice 7 (Obsidian):** lazy vault setup at first Keep; stale-bookmark
-re-grant; per-note failure **surfacing** UI (Retry / Re-grant / Set-up) — this slice
-only *stores* the reason; startup reconciliation of a killed `writing` note; possibly
-offloading Obsidian file I/O off the main actor.
+**Landed as a post-merge tech-lead-review follow-up (this PR):** startup `writing →
+pending` reconciliation (`ExportReconciler`, §4); off-device tests for
+`ObsidianFolderDestination.writeBatch` (Slice 7's real path); the pre-write `save()`
+is do/`catch` with rollback instead of a silent `try?`; and the machine gained the
+`.interrupt` transition + a shared `Note.setRetention` mapping.
 
-**Noted by tech-lead review (fold in when the surfacing UI lands, Slice 7):**
+**Still deferred to Slice 7 (Obsidian):** lazy vault setup at first Keep;
+stale-bookmark re-grant; per-note failure **surfacing** UI (Retry / Re-grant /
+Set-up) — this slice only *stores* the reason; possibly offloading Obsidian file I/O
+off the main actor.
+
+**Still noted for Slice 7 (fold in when the surfacing UI lands):**
 - A share-sheet **cancel** currently persists `pending(.writeFailed)` — no note is
   lost, but "write failed / Retry" misreads a plain cancel. Give cancel a distinct
   non-error signal (a `cancelled` reason or `pending(nil)`) once the reason is shown.

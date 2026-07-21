@@ -38,6 +38,10 @@ enum ExportEvent: Equatable {
     case fail(ExportFailure)
     /// The confirmed note has been persisted-as-gone: `confirmed` → `deleted`.
     case commit
+    /// Startup recovery for a note stranded mid-write by an app kill: `writing` →
+    /// `pending(nil)`. Not a failure — the attempt was merely interrupted, so it
+    /// carries no reason and returns cleanly to the outbox. See `ExportReconciler`.
+    case interrupt
 }
 
 /// Pure, total transition function. Reused verbatim by the Obsidian slice.
@@ -55,8 +59,27 @@ enum RetentionMachine {
             return .pending(reason)
         case (.confirmed, .commit):
             return .deleted
+        case (.writing, .interrupt):
+            return .pending(nil)
         default:
             return state
+        }
+    }
+}
+
+extension Note {
+    /// Persist a non-terminal `RetentionState` onto this note — the write-side
+    /// counterpart to `Note.retentionState`. `.deleted` is intentionally a no-op:
+    /// deleting the row needs the `ModelContext`, so the caller (`ExportCoordinator`)
+    /// handles that case. Centralising the mapping here keeps `ExportCoordinator` and
+    /// `ExportReconciler` from each re-deriving it.
+    func setRetention(_ state: RetentionState) {
+        switch state {
+        case .kept:            status = .kept;      exportFailureRaw = nil
+        case .pending(let r):  status = .pending;   exportFailureRaw = r?.rawValue
+        case .writing:         status = .writing;   exportFailureRaw = nil
+        case .confirmed:       status = .confirmed; exportFailureRaw = nil
+        case .deleted:         break   // row deletion is the caller's job (needs ModelContext)
         }
     }
 }

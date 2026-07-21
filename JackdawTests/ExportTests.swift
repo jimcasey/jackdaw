@@ -98,11 +98,17 @@ struct RetentionMachineTests {
         #expect(RetentionMachine.next(.confirmed, .commit) == .deleted)
     }
 
+    @Test func writing_interrupt_requeuesAsReasonlessPending() {
+        // Startup recovery for a note stranded mid-write: back to pending, no reason.
+        #expect(RetentionMachine.next(.writing, .interrupt) == .pending(nil))
+    }
+
     @Test func illegalTransitions_areNoOps() {
         #expect(RetentionMachine.next(.kept, .confirm) == .kept)
         #expect(RetentionMachine.next(.writing, .commit) == .writing)          // no delete before confirm
         #expect(RetentionMachine.next(.confirmed, .fail(.writeFailed)) == .confirmed)
         #expect(RetentionMachine.next(.deleted, .beginWrite) == .deleted)      // terminal
+        #expect(RetentionMachine.next(.kept, .interrupt) == .kept)             // interrupt only acts on writing
     }
 }
 
@@ -144,6 +150,9 @@ struct NoteExportFieldsTests {
 final class MockDestination: ExportDestination {
     private(set) var received: [SerializedNote] = []
     var outcomeFor: (SerializedNote) -> ExportOutcome
+    /// Fires at the moment the destination is invoked — after the coordinator's
+    /// pre-write save — so a test can inspect note state mid-flight.
+    var onExport: (() -> Void)?
 
     init(outcomeFor: @escaping (SerializedNote) -> ExportOutcome = { .confirmed(id: $0.id) }) {
         self.outcomeFor = outcomeFor
@@ -151,6 +160,7 @@ final class MockDestination: ExportDestination {
 
     func export(_ notes: [SerializedNote]) async -> [ExportOutcome] {
         received = notes
+        onExport?()
         return notes.map(outcomeFor)
     }
 }
@@ -292,5 +302,116 @@ struct ExportCoordinatorTests {
         #expect(try count(context) == 2)      // both captures survive intact
         #expect(inbox.status == .inbox)
         #expect(snoozed.status == .snoozed)
+    }
+
+    @Test func export_persistsWritingBeforeAwaitingDestination() async throws {
+        // Kill-safety invariant: notes are marked (and saved) `.writing` BEFORE the
+        // possibly-slow/interactive destination runs, so a mid-export kill is recoverable.
+        let context = try makeContext()
+        let a = keptNote("a", in: context)
+        let b = keptNote("b", in: context)
+        try context.save()
+
+        let mock = MockDestination()
+        var sawWritingAtExport = false
+        mock.onExport = { sawWritingAtExport = (a.status == .writing && b.status == .writing) }
+
+        _ = await ExportCoordinator(destination: mock).exportAll(in: context)
+
+        #expect(sawWritingAtExport)
+    }
+}
+
+// MARK: - ObsidianFolderDestination (the real Slice 7 destination) — batch fold
+
+/// Covers the per-note write+verify fold that Slice 7 reuses verbatim. `writeBatch`
+/// is split from the security-scope layer precisely so it's testable off-device
+/// against a plain temp directory; the vault-level failure path is testable via a
+/// `VaultAccess` with no saved bookmark (it throws before any scoping).
+struct ObsidianFolderDestinationTests {
+    private func tempFolder() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("jackdaw-obsidian-tests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+    private func emptyVaultAccess() -> VaultAccess {
+        VaultAccess(store: UserDefaultsVaultBookmarkStore(defaults: UserDefaults(suiteName: UUID().uuidString)!))
+    }
+    private func item(_ markdown: String, fileName: String) -> SerializedNote {
+        SerializedNote(id: UUID(), fileName: fileName, markdown: markdown)
+    }
+
+    @Test func writeBatch_allSucceed_writesEveryFileAndConfirms() throws {
+        let folder = try tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let dest = ObsidianFolderDestination(access: emptyVaultAccess())   // access unused by writeBatch
+        let notes = [item("one", fileName: "a.md"), item("two", fileName: "b.md")]
+
+        let outcomes = dest.writeBatch(notes, into: folder)
+
+        #expect(outcomes == notes.map { .confirmed(id: $0.id) })
+        #expect(try Data(contentsOf: folder.appendingPathComponent("a.md")) == Data("one".utf8))
+        #expect(try Data(contentsOf: folder.appendingPathComponent("b.md")) == Data("two".utf8))
+    }
+
+    @Test func writeBatch_oneBadFilename_failsOnlyThatNote() throws {
+        let folder = try tempFolder()
+        defer { try? FileManager.default.removeItem(at: folder) }
+        let dest = ObsidianFolderDestination(access: emptyVaultAccess())
+        let good = item("ok", fileName: "good.md")
+        let bad = item("nope", fileName: "missing-subdir/bad.md")   // parent dir absent → write fails
+
+        let outcomes = dest.writeBatch([good, bad], into: folder)
+
+        #expect(outcomes[0] == .confirmed(id: good.id))
+        #expect(outcomes[1] == .failed(id: bad.id, reason: .writeFailed))
+    }
+
+    @MainActor
+    @Test func export_noVaultConfigured_failsWholeBatch() async {
+        let dest = ObsidianFolderDestination(access: emptyVaultAccess())
+        let notes = [item("x", fileName: "x.md"), item("y", fileName: "y.md")]
+
+        let outcomes = await dest.export(notes)
+
+        #expect(outcomes == notes.map { .failed(id: $0.id, reason: .noVaultConfigured) })
+    }
+}
+
+// MARK: - ExportReconciler (startup recovery of stranded writing notes)
+
+@MainActor
+struct ExportReconcilerTests {
+    private func makeContext() throws -> ModelContext {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Note.self, configurations: config)
+        return ModelContext(container)
+    }
+
+    @Test func reconcile_requeuesWritingAsReasonlessPending_leavesOthersUntouched() throws {
+        let context = try makeContext()
+        let stranded = Note(body: "stranded"); stranded.status = .writing
+        let kept = Note(body: "kept"); kept.status = .kept
+        let inbox = Note(body: "inbox")
+        [stranded, kept, inbox].forEach { context.insert($0) }
+        try context.save()
+
+        let recovered = ExportReconciler.reconcileInterruptedWrites(in: context)
+
+        #expect(recovered == 1)
+        #expect(stranded.status == .pending)
+        #expect(stranded.exportFailure == nil)   // interrupted, not failed — no reason
+        #expect(kept.status == .kept)
+        #expect(inbox.status == .inbox)
+    }
+
+    @Test func reconcile_isIdempotent() throws {
+        let context = try makeContext()
+        let w = Note(body: "w"); w.status = .writing; context.insert(w)
+        try context.save()
+
+        #expect(ExportReconciler.reconcileInterruptedWrites(in: context) == 1)  // recovered
+        #expect(ExportReconciler.reconcileInterruptedWrites(in: context) == 0)  // nothing left
     }
 }

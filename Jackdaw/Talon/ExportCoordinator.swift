@@ -1,5 +1,6 @@
 import Foundation
 import SwiftData
+import os
 
 /// Drives the Kept set through the `RetentionMachine` against an
 /// `ExportDestination`. This is the layer *above* the seam: it serializes each
@@ -16,6 +17,8 @@ import SwiftData
 struct ExportCoordinator {
     let destination: ExportDestination
     let serializer = NoteSerializer()
+
+    private static let log = Logger(subsystem: "com.jimcodes.Jackdaw", category: "export")
 
     /// Export every exportable note (`kept` or a previously-failed `pending`) in the
     /// store, in one batch. Returns the number confirmed (for a UI confirmation).
@@ -37,9 +40,20 @@ struct ExportCoordinator {
 
         // 1. kept/pending → writing, and persist that intent before the (possibly
         //    slow / interactive) write, so a mid-export kill leaves notes as
-        //    `writing` — recoverable — never silently lost.
+        //    `writing` — recoverable by `ExportReconciler` at next launch — never
+        //    silently lost.
         for note in notes { apply(.beginWrite, to: note, in: context) }
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            // This save underwrites the kill-safety guarantee. If it fails the
+            // guarantee is void, so roll back the `.writing` marks (leaving the notes
+            // `.kept`, still exportable) and abort rather than hand un-persisted notes
+            // to the destination.
+            Self.log.error("Pre-export save failed; aborting export run: \(String(describing: error))")
+            context.rollback()
+            return 0
+        }
 
         // 2. Serialize and hand the whole batch to the destination.
         let serialized = notes.map { serializer.serialize(NoteSnapshot($0)) }
@@ -59,7 +73,11 @@ struct ExportCoordinator {
                 apply(.fail(reason), to: note, in: context)  // writing → pending(reason)
             }
         }
-        try? context.save()
+        do {
+            try context.save()
+        } catch {
+            Self.log.error("Post-export save failed; some outcomes may not have persisted: \(String(describing: error))")
+        }
         return confirmedCount
     }
 
@@ -82,23 +100,14 @@ struct ExportCoordinator {
     }
 
     /// Fire one machine event and reflect the resulting `RetentionState` onto the
-    /// persisted note (`.deleted` → an actual row delete).
+    /// persisted note (`.deleted` → an actual row delete; everything else via the
+    /// shared `Note.setRetention` mapping).
     private func apply(_ event: ExportEvent, to note: Note, in context: ModelContext) {
-        switch RetentionMachine.next(note.retentionState, event) {
-        case .kept:
-            note.status = .kept
-            note.exportFailureRaw = nil
-        case .pending(let reason):
-            note.status = .pending
-            note.exportFailureRaw = reason?.rawValue
-        case .writing:
-            note.status = .writing
-            note.exportFailureRaw = nil
-        case .confirmed:
-            note.status = .confirmed
-            note.exportFailureRaw = nil
-        case .deleted:
+        let next = RetentionMachine.next(note.retentionState, event)
+        if case .deleted = next {
             context.delete(note)
+        } else {
+            note.setRetention(next)
         }
     }
 }
