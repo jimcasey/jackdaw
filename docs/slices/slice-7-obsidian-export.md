@@ -13,9 +13,12 @@
 > implementation Slice 7**. The build-order section is titled "Slice 6 — Obsidian
 > export"; this file uses impl numbering to sit next to `slice-6-apple-notes-export.md`.
 >
-> **This is v1 feature-complete.** After this slice a Kept note is verified into
-> the Obsidian vault, deleted from Jackdaw, and appears in Obsidian on both devices
-> via Obsidian Sync (T2). No shipped destination remains after Obsidian.
+> **This is v1 CODE-complete — feature-complete is gated on the on-device pass (§10).**
+> The intent: a Kept note is verified into the Obsidian vault, deleted from Jackdaw,
+> and appears in Obsidian on both devices via Obsidian Sync (T2). No shipped
+> destination remains after Obsidian. But "feature-complete" is only true once the
+> owner's §10 on-device checklist passes — CI cannot prove a byte reaches the vault,
+> so a green build is *code*-complete, not *feature*-complete.
 
 Owner-settled (build-order, ADR 0001): retention is **hold-until-sync-confirmed**
 (delete only after a verified write); **lazy vault setup at first export, NOT a
@@ -397,9 +400,20 @@ picker, bookmark, or `VaultAccess.withVaultURL` (device-only by construction —
   deliberate Retry/Re-grant. Implemented: `keep()` fires `autoExportKept`; launch
   drains lingering `kept`; the bottom bar is reason-driven.
 - **B. Surfacing depth (§5) → counts-only first.** The bottom bar shows count + the
-  right action (Set up / Re-grant / Retry); no per-note list yet. The `returnToInbox`
-  transition + its test ship now (logic-ready) but the per-note stuck list is deferred
-  until counts prove too blunt in real use.
+  right action (Set up / Re-grant / Retry); no per-note list yet. **`returnToInbox` is
+  wired** as a "Return N to inbox" escape on the stuck bar (long-press + VoiceOver
+  Actions rotor) — added after the checkpoint review flagged that a persistently
+  failing note would otherwise keep the bar lit forever and wedge the funnel; it stays
+  counts-only (acts on the whole stuck set, not a browsable per-note list). The
+  per-note stuck *list* remains deferred until counts prove too blunt.
+
+**Checkpoint-review follow-ups folded in (this PR):** the `returnToInbox` escape
+(above); foreground re-drive of lingering `kept` (not just at launch); a single
+merged high-signal export announcement; wrapping + 44 pt bar label with a calmer
+`.bordered` style for recurring retries; `.accessibilityActions` for the swipe verbs;
+the `accessLost` icon fixed off `.icloud`. **Expected-behavior note:** a force-quit
+mid-write leaves a note `pending(nil)` (reconciled), which reads as "Retry 1" on the
+bar — that's correct hybrid behavior (pending = deliberate-retry-only), not a bug.
 
 ## Related
 - Mechanism + topology + on-device gates: `docs/adr/0001-obsidian-write-mechanism.md`

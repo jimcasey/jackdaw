@@ -450,6 +450,13 @@ struct OutboxSummaryTests {
         #expect(OutboxSummary.classify(outbox) == .stuck(count: 2, reason: .accessLost))
     }
 
+    @Test func noVaultOutranksAccessLost_isNeedsSetup() {
+        // Top of the priority ladder: no vault at all dominates a stale bookmark —
+        // set up first, and `.needsSetup` short-circuits before `.stuck`.
+        let outbox = [note(.pending, .accessLost), note(.pending, .noVaultConfigured)]
+        #expect(OutboxSummary.classify(outbox) == .needsSetup(count: 2))
+    }
+
     @Test func keptAlongsidePending_keptNeverReportedAsStuck() {
         // Invariant: a happily-kept note never inflates the stuck count.
         let outbox = [note(.kept), note(.pending, .accessLost)]
@@ -528,9 +535,11 @@ struct AutoExportKeptTests {
         #expect(remaining.first?.status == .pending)
     }
 
-    @Test func autoExportKept_ignoresInFlightWriting() async throws {
-        // Race-safety mechanism: a note already `.writing` (a concurrent run claimed
-        // it) is never re-fetched, so it can't be double-claimed.
+    @Test func autoExportKept_doesNotFetchWritingNotes() async throws {
+        // Half of the race-safety mechanism: `autoExportKept` fetches only `.kept`, so a
+        // note a concurrent run already marked `.writing` is never re-claimed. (The
+        // other half — that `.writing` is persisted before the await — is covered by
+        // `export_persistsWritingBeforeAwaitingDestination`.)
         let context = try makeContext()
         let inFlight = Note(body: "w"); inFlight.status = .writing; context.insert(inFlight)
         try context.save()

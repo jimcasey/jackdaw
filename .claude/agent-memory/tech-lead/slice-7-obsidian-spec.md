@@ -35,10 +35,20 @@ across cold launch, Obsidian Sync, re-grant, VoiceOver) is **owner-on-device**.
 - `RootView.task` — reconcile then `autoExportKept` at launch.
 - **Deleted** `VaultProofView` (Slice 1 throwaway).
 
+## Checkpoint-review follow-ups (folded into the same PR)
+Panel: tech-lead SHIP; design + product FIX-THEN-SHIP on one shared blocker —
+`returnToInbox` was built/tested but **unwired**, so a poison note (persistent
+writeFailed/verifyMismatch) would keep "Retry 1" lit forever and wedge the funnel.
+Fixed by wiring it as a "Return N to inbox" escape (context menu + VoiceOver Actions
+rotor) on the stuck bar — stays counts-only. Also landed: foreground re-drive of
+lingering `kept`; single merged high-signal announcement; wrapping/44pt bar label +
+calmer `.bordered` for retries; `.accessibilityActions` for swipe verbs; `accessLost`
+icon fixed; `currentOutboxState` now sources the predicate from `ExportCoordinator.outbox`.
+
 ## Deferred / notes
-- `AppleNotesDestination` is now **unused by the app** (Triage points at Obsidian) but
-  left in-tree as the seam's documented second adapter — optional cleanup, flagged in
-  the PR.
+- `AppleNotesDestination` is now **unused by the app** (Triage points at Obsidian) —
+  kept in-tree **deliberately** as the seam's documented second adapter (now labeled
+  as such in its header + spec). Not shipped; don't delete as rot, don't wire back.
 - Obsidian file I/O still on `@MainActor` via the seam — fine for v1 (sub-ms local
   write); offload only if on-device profiling shows a hitch.
 - `pending(nil)` (reconciled interrupted write) currently reads as "Retry" in the bar

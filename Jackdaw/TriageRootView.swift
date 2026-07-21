@@ -65,6 +65,13 @@ struct TriageRootView: View {
                             Label("Discard", systemImage: "trash")
                         }
                     }
+                    // Swipe actions are invisible to VoiceOver; expose the three verbs
+                    // on the Actions rotor too (a11y baseline for the shipped triage screen).
+                    .accessibilityActions {
+                        Button("Keep") { keep(note) }
+                        Button("Snooze") { snooze(note) }
+                        Button("Discard", role: .destructive) { discard(note) }
+                    }
             }
         }
         .overlay { if visible.isEmpty { emptyState } }
@@ -85,7 +92,9 @@ struct TriageRootView: View {
         }
         .onAppear { refreshToken += 1 }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { refreshToken += 1 }
+            // Re-drive any lingering kept on foreground too (RootView drains at cold
+            // launch; this covers a note kept just before a background without a kill).
+            if phase == .active { refreshToken += 1; autoExport() }
         }
         .onDisappear { finalizePendingDiscard() }   // navigating to the editor commits a pending discard
     }
@@ -135,35 +144,54 @@ struct TriageRootView: View {
 
     /// The steady-state export residue bar (counts-only). Absent when the funnel is
     /// clear (`.empty`) or notes are silently auto-exporting (`.draining`); present
-    /// only when the owner must act — set up the vault, re-grant, or retry.
+    /// only when the owner must act — set up the vault, re-grant, or retry. The two
+    /// recoverable-failure cases carry a "Return to inbox" escape (long-press / the
+    /// VoiceOver Actions rotor) so a persistently-failing note can't wedge the funnel.
     @ViewBuilder private var exportBar: some View {
         switch outboxState {
         case .needsSetup(let n):
-            exportBarButton("Set up vault to export \(n)", systemImage: "folder.badge.plus") {
+            // First-time acquisition: a genuine call-to-action → prominent.
+            exportBarButton("Set up vault to export \(n)", systemImage: "folder.badge.plus", prominent: true) {
                 showingVaultPicker = true
             }
         case .stuck(let n, .accessLost):
-            exportBarButton("Reconnect your vault · \(n) waiting", systemImage: "arrow.clockwise.icloud") {
+            exportBarButton("Reconnect your vault — \(n) waiting",
+                            systemImage: "exclamationmark.arrow.circlepath", prominent: false) {
                 showingVaultPicker = true
             }
+            .stuckEscape(count: n) { returnStuckToInbox() }
         case .stuck(let n, _):
-            exportBarButton("Retry \(n)", systemImage: "arrow.clockwise") { driveExport() }
+            exportBarButton("Retry \(n)", systemImage: "arrow.clockwise", prominent: false) {
+                driveExport()
+            }
+            .stuckEscape(count: n) { returnStuckToInbox() }
         case .empty, .draining:
             EmptyView()
         }
     }
 
-    private func exportBarButton(_ title: String, systemImage: String,
+    /// Recurring failures use a calmer `.bordered`; only the first-time setup CTA is
+    /// `.borderedProminent`. The label wraps and floors at a 44 pt target so a
+    /// multi-word title stays legible + tappable at large Dynamic Type sizes.
+    @ViewBuilder
+    private func exportBarButton(_ title: String, systemImage: String, prominent: Bool,
                                  action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: systemImage)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
+        let label = Label(title, systemImage: systemImage)
+            .lineLimit(2)
+            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.vertical, 6)
+        if prominent {
+            Button(action: action) { label }
+                .buttonStyle(.borderedProminent)
+                .disabled(isExporting)
+                .padding(.horizontal).padding(.bottom, 8)
+        } else {
+            Button(action: action) { label }
+                .buttonStyle(.bordered)
+                .disabled(isExporting)
+                .padding(.horizontal).padding(.bottom, 8)
         }
-        .buttonStyle(.borderedProminent)
-        .disabled(isExporting)
-        .padding(.horizontal)
-        .padding(.bottom, 8)
     }
 
     // MARK: - Actions
@@ -211,33 +239,42 @@ struct TriageRootView: View {
         }
     }
 
+    /// Announce success **and** residue as a *single* utterance — two back-to-back
+    /// `.post()`s clobber each other, so the failure half (the important one) got cut.
     private func announceExportResult(confirmed: Int) {
+        var parts: [String] = []
         if confirmed > 0 {
             let noun = confirmed == 1 ? "note" : "notes"
-            AccessibilityNotification.Announcement("Exported \(confirmed) \(noun).").post()
+            parts.append("Exported \(confirmed) \(noun).")
         }
-        // Announce the residue (fresh fetch — the @Query hasn't re-rendered yet).
+        // Residue keys off a fresh fetch — the @Query hasn't re-rendered yet.
         switch currentOutboxState() {
-        case .needsSetup:
-            AccessibilityNotification.Announcement("Vault not set up yet.").post()
-        case .stuck(let n, .accessLost):
-            AccessibilityNotification.Announcement("Couldn't reach your vault. \(n) waiting to reconnect.").post()
-        case .stuck(let n, _):
-            AccessibilityNotification.Announcement("\(n) still need attention.").post()
-        case .empty, .draining:
-            break
+        case .needsSetup:                    parts.append("Vault not set up yet.")
+        case .stuck(let n, .accessLost):     parts.append("Couldn't reach your vault. \(n) waiting to reconnect.")
+        case .stuck(let n, _):               parts.append("\(n) still need attention.")
+        case .empty, .draining:              break
+        }
+        if !parts.isEmpty {
+            AccessibilityNotification.Announcement(parts.joined(separator: " ")).post()
         }
     }
 
     /// Classify a *fresh* fetch of the outbox — used right after an export completes,
     /// before the `@Query` has re-rendered, so an announcement reflects the real state.
+    /// Sources the fetch from the coordinator so the kept||pending predicate lives in
+    /// one place, not a fourth literal copy.
     private func currentOutboxState() -> OutboxState {
-        let kept = NoteStatus.kept.rawValue
+        OutboxSummary.classify(ExportCoordinator(destination: obsidian).outbox(in: context))
+    }
+
+    /// Return every stuck (`pending`) note to the un-triaged inbox — the counts-only
+    /// escape from a poison note that would otherwise keep the bar lit forever.
+    private func returnStuckToInbox() {
         let pending = NoteStatus.pending.rawValue
-        let descriptor = FetchDescriptor<Note>(
-            predicate: #Predicate { $0.statusRaw == kept || $0.statusRaw == pending }
-        )
-        return OutboxSummary.classify((try? context.fetch(descriptor)) ?? [])
+        let descriptor = FetchDescriptor<Note>(predicate: #Predicate { $0.statusRaw == pending })
+        for note in (try? context.fetch(descriptor)) ?? [] {
+            vm.returnToInbox(note, in: context)
+        }
     }
 
     private func discard(_ note: Note) {
@@ -269,5 +306,17 @@ struct TriageRootView: View {
             vm.commitDiscard(id, in: context)
             bannerNoteID = nil
         }
+    }
+}
+
+private extension View {
+    /// The "Return N to inbox" escape on a stuck export bar — reachable by long-press
+    /// (context menu) and the VoiceOver Actions rotor. Keeps the surface counts-only:
+    /// it acts on the whole stuck set, not a browsable per-note list.
+    func stuckEscape(count: Int, action: @escaping () -> Void) -> some View {
+        contextMenu {
+            Button("Return \(count) to inbox", systemImage: "tray.and.arrow.down", action: action)
+        }
+        .accessibilityAction(named: Text("Return \(count) to inbox"), action)
     }
 }

@@ -96,6 +96,13 @@ struct ExportCoordinator {
         exportable(in: context).count
     }
 
+    /// The exportable set (`kept` + `pending`), for a *fresh* read outside the view's
+    /// `@Query` — e.g. classifying the outbox for an announcement right after an
+    /// export, before SwiftUI re-runs `body`. Single source for the predicate.
+    func outbox(in context: ModelContext) -> [Note] {
+        exportable(in: context)
+    }
+
     // MARK: - Private
 
     private func exportable(in context: ModelContext) -> [Note] {

@@ -6,6 +6,12 @@ import UIKit
 /// write path — Apple Notes has no clean write API — and it is deliberately
 /// scaffolding, not a trustworthy v1 destination (that is Obsidian, Slice 6).
 ///
+/// **Retained on purpose, not stranded.** As of Slice 7 the app wires Triage to
+/// `ObsidianFolderDestination` only, so this type is unreferenced by production. It
+/// is kept as the seam's **second adapter** — living proof that `ExportDestination`
+/// isn't hard-wired to Obsidian — NOT as a shipped destination. Don't delete it as
+/// rot, and don't wire it back.
+///
 /// **DEGRADED confirm (ADR 0001, Candidate A), stated plainly:** the share sheet
 /// **cannot** report whether "Save to Notes" actually succeeded — only whether the
 /// user *completed* an action versus cancelled. So for this milestone we treat
