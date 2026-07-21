@@ -100,11 +100,18 @@ struct VaultProofView: View {
 
     private func writeTestNote() {
         let name = "jackdaw-slice1-\(Self.fileTimestamp()).md"
-        do {
-            try destination.export(fileName: name, markdown: Self.testMarkdown())
-            resultLine = "Wrote \(name)\nVerify: PASS ✅"
-        } catch {
-            resultLine = "Wrote \(name)\nVerify: FAIL ❌ (\(describe(error)))"
+        let item = SerializedNote(id: UUID(), fileName: name, markdown: Self.testMarkdown())
+        Task {
+            guard let outcome = await destination.export([item]).first else {
+                resultLine = "Wrote \(name)\nVerify: FAIL ❌ (no outcome)"
+                return
+            }
+            switch outcome {
+            case .confirmed:
+                resultLine = "Wrote \(name)\nVerify: PASS ✅"
+            case .failed(_, let reason):
+                resultLine = "Wrote \(name)\nVerify: FAIL ❌ (\(reason.rawValue))"
+            }
         }
     }
 
