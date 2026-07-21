@@ -149,6 +149,36 @@ Merge any PR to `main` (Phase 1's `PR CI` gates it first). The `TestFlight`
 workflow archives, uploads, and the build appears in TestFlight; install it on
 your device from the TestFlight app.
 
+## Step 4 — Skip docs-only merges (recommended)
+
+The `TestFlight` workflow fires on **every** merge to `main` — including
+docs/prose-only merges that don't change the app, each a ~15–20 min archive plus
+a redundant TestFlight build. Exclude them:
+
+On the `TestFlight` workflow's **Branch Changes → `main`** start condition, add a
+**Files and Folders** custom condition set to **"Don't start a build"** for
+**`docs/`**, **`.claude/`**, and the root **`CLAUDE.md`** (the doc/prose paths). A
+merge touching only those is skipped; any change under `Jackdaw/`, the
+`.xcodeproj`, or `ci_scripts/` still builds.
+
+> **`.claude/` is hidden** (a dotfolder) in the file picker — press **⌘⇧.**
+> (Command-Shift-period) to reveal hidden items, then select it. Don't forget the
+> root **`CLAUDE.md`** file, which a folder-only exclusion would miss. Equivalent
+> alternative that avoids the hidden folder entirely: instead of excluding the
+> doc paths, set **"Start a build"** for the code folders only — `Jackdaw/`,
+> `Jackdaw.xcodeproj/`, `ci_scripts/`.
+
+**Why this is safe here but we did *not* do it for `PR CI`:** `TestFlight` is not
+a required status check, so skipping a docs-only merge has no side effect. `PR CI`
+*is* required — skipping it would leave a docs-only PR with an unreported required
+check and **block** the merge (see `docs/dev-workflow.md`). So: skip on
+`TestFlight`, always-run on `PR CI` (a 3-min unit-test build is cheap and keeps
+the gate clean).
+
+> Verify the picker's semantics when you set it: the intent is "skip only when
+> **all** changed files are within the excluded folders." Sanity-check that a
+> docs-only merge is skipped and a code merge still builds.
+
 ## Gotcha — first-upload build number
 
 Slice 0 already uploaded a manual build under version **1.0**. If the first
