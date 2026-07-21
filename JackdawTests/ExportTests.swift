@@ -415,3 +415,131 @@ struct ExportReconcilerTests {
         #expect(ExportReconciler.reconcileInterruptedWrites(in: context) == 0)  // nothing left
     }
 }
+
+// MARK: - OutboxSummary (the bottom-bar classifier — Slice 7)
+
+struct OutboxSummaryTests {
+    private func note(_ status: NoteStatus, _ reason: ExportFailure? = nil) -> Note {
+        let n = Note(body: "x"); n.status = status; n.exportFailure = reason; return n
+    }
+
+    @Test func emptyOutbox_isEmpty() {
+        #expect(OutboxSummary.classify([]) == .empty)
+    }
+
+    @Test func onlyKept_isDraining() {
+        // Hybrid: kept notes are auto-exporting; the bar stays silent.
+        #expect(OutboxSummary.classify([note(.kept), note(.kept)]) == .draining(count: 2))
+    }
+
+    @Test func allNoVault_isNeedsSetup() {
+        let outbox = [note(.pending, .noVaultConfigured), note(.pending, .noVaultConfigured)]
+        #expect(OutboxSummary.classify(outbox) == .needsSetup(count: 2))
+    }
+
+    @Test func writeFailures_areStuckRetry() {
+        let outbox = [note(.pending, .writeFailed), note(.pending, .verifyMismatch)]
+        // verifyMismatch outranks writeFailed in the dominant-reason priority.
+        #expect(OutboxSummary.classify(outbox) == .stuck(count: 2, reason: .verifyMismatch))
+    }
+
+    @Test func mixedReasons_pickVaultLevelDominant() {
+        // A vault-level blocker (accessLost) wins over a per-note writeFailed:
+        // nothing exports until the vault is fixed. Count is the whole pending set.
+        let outbox = [note(.pending, .writeFailed), note(.pending, .accessLost), note(.kept)]
+        #expect(OutboxSummary.classify(outbox) == .stuck(count: 2, reason: .accessLost))
+    }
+
+    @Test func keptAlongsidePending_keptNeverReportedAsStuck() {
+        // Invariant: a happily-kept note never inflates the stuck count.
+        let outbox = [note(.kept), note(.pending, .accessLost)]
+        #expect(OutboxSummary.classify(outbox) == .stuck(count: 1, reason: .accessLost))
+    }
+
+    @Test func reasonlessPending_fallsThroughToRetry() {
+        // An interrupted write reconciled to pending(nil) reads as a plain Retry.
+        #expect(OutboxSummary.classify([note(.pending, nil)]) == .stuck(count: 1, reason: .writeFailed))
+    }
+}
+
+// MARK: - Return-to-inbox (stuck-note escape hatch — Slice 7)
+
+@MainActor
+struct ReturnToInboxTests {
+    private func makeContext() throws -> ModelContext {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Note.self, configurations: config)
+        return ModelContext(container)
+    }
+
+    @Test func returnToInbox_resetsStatusAndClearsReason() throws {
+        let context = try makeContext()
+        let stuck = Note(body: "stuck"); stuck.status = .pending; stuck.exportFailure = .writeFailed
+        let sibling = Note(body: "sib"); sibling.status = .pending; sibling.exportFailure = .accessLost
+        [stuck, sibling].forEach { context.insert($0) }
+        try context.save()
+
+        TriageViewModel().returnToInbox(stuck, in: context)
+
+        #expect(stuck.status == .inbox)
+        #expect(stuck.exportFailure == nil)
+        #expect(sibling.status == .pending)          // untouched
+        #expect(sibling.exportFailure == .accessLost)
+    }
+
+    @Test func returnToInbox_onNonPending_isNoOp() throws {
+        let context = try makeContext()
+        let kept = Note(body: "k"); kept.status = .kept; context.insert(kept)
+        try context.save()
+
+        TriageViewModel().returnToInbox(kept, in: context)
+
+        #expect(kept.status == .kept)               // guard held
+    }
+}
+
+// MARK: - autoExportKept (hybrid auto-export path — Slice 7)
+
+@MainActor
+struct AutoExportKeptTests {
+    private func makeContext() throws -> ModelContext {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Note.self, configurations: config)
+        return ModelContext(container)
+    }
+    private func count(_ context: ModelContext) throws -> Int {
+        try context.fetch(FetchDescriptor<Note>()).count
+    }
+
+    @Test func autoExportKept_drainsKept_ignoresPending() async throws {
+        let context = try makeContext()
+        let kept = Note(body: "kept"); kept.status = .kept
+        let failed = Note(body: "failed"); failed.status = .pending; failed.exportFailure = .writeFailed
+        [kept, failed].forEach { context.insert($0) }
+        try context.save()
+
+        let mock = MockDestination()   // confirms → deletes
+        let confirmed = await ExportCoordinator(destination: mock).autoExportKept(in: context)
+
+        #expect(confirmed == 1)                          // only the kept note exported
+        #expect(mock.received.count == 1)
+        let remaining = try context.fetch(FetchDescriptor<Note>())
+        #expect(remaining.map(\.body) == ["failed"])     // the pending note was NOT auto-retried
+        #expect(remaining.first?.status == .pending)
+    }
+
+    @Test func autoExportKept_ignoresInFlightWriting() async throws {
+        // Race-safety mechanism: a note already `.writing` (a concurrent run claimed
+        // it) is never re-fetched, so it can't be double-claimed.
+        let context = try makeContext()
+        let inFlight = Note(body: "w"); inFlight.status = .writing; context.insert(inFlight)
+        try context.save()
+
+        let mock = MockDestination()
+        let confirmed = await ExportCoordinator(destination: mock).autoExportKept(in: context)
+
+        #expect(confirmed == 0)
+        #expect(mock.received.isEmpty)
+        #expect(try count(context) == 1)                 // the writing note is untouched
+    }
+}

@@ -81,6 +81,15 @@ struct ExportCoordinator {
         return confirmedCount
     }
 
+    /// The hybrid auto-export path (Slice 7): silently export only the freshly-`kept`
+    /// notes. Deliberately does NOT touch `pending` — a failed note rests until the
+    /// owner retries, so a broken vault can't hammer on every Keep. Fire-and-forget
+    /// from `keep()` and once at launch (drains any note kept just before a kill).
+    @discardableResult
+    func autoExportKept(in context: ModelContext) async -> Int {
+        await export(fetch(status: .kept, in: context), in: context)
+    }
+
     /// Count of notes awaiting export — the "outbox" badge / funnel-honesty count
     /// (PRD success criterion). Drives the Export affordance's enabled state.
     func exportableCount(in context: ModelContext) -> Int {
@@ -94,6 +103,15 @@ struct ExportCoordinator {
         let pending = NoteStatus.pending.rawValue
         let descriptor = FetchDescriptor<Note>(
             predicate: #Predicate { $0.statusRaw == kept || $0.statusRaw == pending },
+            sortBy: [SortDescriptor(\Note.createdAt)]
+        )
+        return (try? context.fetch(descriptor)) ?? []
+    }
+
+    private func fetch(status: NoteStatus, in context: ModelContext) -> [Note] {
+        let raw = status.rawValue
+        let descriptor = FetchDescriptor<Note>(
+            predicate: #Predicate { $0.statusRaw == raw },
             sortBy: [SortDescriptor(\Note.createdAt)]
         )
         return (try? context.fetch(descriptor)) ?? []

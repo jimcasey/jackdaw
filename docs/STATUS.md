@@ -32,8 +32,8 @@ with **tripod checkpoint reviews**, and a **live Xcode Cloud CI/CD pipeline**
 | 3 | Capture rework → Triage-root + auto-presented Capture **sheet** | ✅ done |
 | 4 | Real Triage inbox (Keep/Snooze/Discard, undo, editor) | ✅ done |
 | 5 | Location context (in-app precise GPS, async backfill) | ✅ done |
-| 6 | **Apple Notes export** (intermediate milestone) | ✅ **merged (#9), PR CI green; tech-lead-review follow-ups (launch reconciliation, Obsidian-fold tests, save-safety) in a follow-up PR** |
-| 7 | Obsidian export → v1 complete | ▶ **NEXT — not started** |
+| 6 | **Apple Notes export** (intermediate milestone) | ✅ merged (#9 + follow-up #11) |
+| 7 | **Obsidian export → v1 complete** | ▶ **implemented on branch, CI-testable core green; owes on-device verification** |
 
 **Numbering caveat:** implementation slice numbers run **one ahead** of the
 at-a-glance table in `docs/build-order.md` (the capture rework became its own
@@ -61,22 +61,23 @@ files are the detailed specs.
   `VaultProofView` harness stays parked/throwaway.
 
 ### Immediate next step
-Slice 6 (Apple Notes export) is **merged and CI-green**; a tech-lead-review follow-up
-PR is in flight (launch reconciliation + Obsidian-fold tests + save-safety). On-device
-smoke check still owed (batch "Export N to Notes" share sheet; a frontmatter'd note
-landing in Apple Notes) — but time-box it: Apple Notes is throwaway scaffolding.
+**Slice 7 — Obsidian export is implemented on the branch** (spec:
+`docs/slices/slice-7-obsidian-export.md`). Owner decided: **Hybrid** export trigger
+(auto-export on Keep once a vault exists; first Keep with no vault waits for a
+deliberate "Set up vault"; failures rest until Retry/Re-grant) + **counts-only**
+surfacing. Triage now points at `ObsidianFolderDestination`; `keep()` auto-exports;
+`RootView` drains lingering `kept` at launch; the reason-driven **bottom bar** (Set up
+/ Re-grant / Retry) replaces the old Apple Notes button; `VaultProofView` deleted.
+New CI-tested logic: `OutboxSummary` classifier + `returnToInbox` + `autoExportKept`.
 
-**Then Slice 7 — Obsidian export** (v1 feature-complete): swap `AppleNotesDestination`
-→ an `ObsidianDestination` behind the *same* `ExportCoordinator`; reuse the serializer
-+ retention machine + `ObsidianFolderDestination.writeBatch` **verbatim** (all now
-tested). Its **entry checklist** (from the PR #9 checkpoint review + the follow-up):
-lazy vault setup at first Keep; stale-bookmark re-grant (`accessLost` → Re-grant); the
-pending/failed **surfacing** UI (this slice only *stores* the reason) — recorded as
-**act-on-stuck-notes only, never a browsable list** (product-lead non-goal); export
-affordance on the **trailing/bottom** bar, not the leading slot (design-lead);
-failure/cancel must **announce (VoiceOver) + surface visibly**; give a share-sheet
-cancel a distinct non-error reason; and decide **auto-export-on-Keep vs. manual
-flush** for Obsidian's silent write.
+**The `PR CI` green is NOT "done" for this slice** — it only proves the classifier,
+the transition, and that the reused pipeline holds. **The v1 acceptance bar is an
+owner on-device checklist** (spec §10): the document-picker vends a persistently
+writable bookmark from the real lazy trigger; the bookmark survives a cold relaunch;
+a verified `.md` lands in Obsidian on both devices via Sync; **re-grant** recovers a
+stale bookmark (hardest to test — force it via "clear vault"/rename the folder);
+VoiceOver announces; the bottom bar doesn't collide with the undo banner. After that
+passes on-device, **v1 is feature-complete.**
 
 ### Recently landed
 **PRs #1–#7 are all merged to `main`** — the PR-based workflow, the tripod-review

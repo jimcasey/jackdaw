@@ -29,9 +29,16 @@ struct RootView: View {
         .sheet(isPresented: $showPriming) {
             LocationPrimingSheet()
         }
-        // Recover any note stranded mid-export by a prior app kill (writing → pending),
-        // so it re-surfaces in the outbox instead of being invisible everywhere.
-        .task { ExportReconciler.reconcileInterruptedWrites(in: context) }
+        .task {
+            // Recover any note stranded mid-export by a prior app kill (writing →
+            // pending), then silently drain any note kept just before the kill
+            // (auto-export never ran). Neither presents a picker — a note with no
+            // vault simply rests as pending(noVaultConfigured) and the Triage bar
+            // invites setup.
+            ExportReconciler.reconcileInterruptedWrites(in: context)
+            let destination = ObsidianFolderDestination(access: VaultAccess(store: UserDefaultsVaultBookmarkStore()))
+            await ExportCoordinator(destination: destination).autoExportKept(in: context)
+        }
     }
 
     /// Once-only, after the first Capture session ends and before any system

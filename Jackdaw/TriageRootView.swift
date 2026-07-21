@@ -1,12 +1,21 @@
 import SwiftUI
 import SwiftData
+import UniformTypeIdentifiers
 
-/// The app root and the real triage inbox: a batch of un-triaged (and due-snoozed)
-/// notes with three swipe actions — Keep / Snooze / Discard — light editing on tap,
-/// and a discard-undo banner. Grows the earlier read-only list.
+/// The app root and the real triage inbox: un-triaged (and due-snoozed) notes with
+/// three swipe actions — Keep / Snooze / Discard — light editing on tap, and a
+/// discard-undo banner. Keep now **auto-exports to Obsidian** (Slice 7, hybrid): a
+/// kept note writes to the vault and vanishes silently. The bottom bar appears only
+/// for the *residue* the owner must act on — set up the vault, re-grant access, or
+/// retry a stuck note — and is absent when the funnel is clear.
 struct TriageRootView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
+
+    private let vaultStore = UserDefaultsVaultBookmarkStore()
+    private var obsidian: ObsidianFolderDestination {
+        ObsidianFolderDestination(access: VaultAccess(store: vaultStore))
+    }
 
     // Candidate set (reactive). Kept primitive — string literals mirror
     // NoteStatus.inbox/.snoozed rawValues (asserted in TriageTests). The due-filter
@@ -26,7 +35,10 @@ struct TriageRootView: View {
     @State private var bannerNoteID: UUID?
     @State private var discardTask: Task<Void, Never>?
     @State private var isExporting = false
+    @State private var showingVaultPicker = false
     @State private var refreshToken = 0   // bumped on appear/active to recompute due-ness
+
+    private var outboxState: OutboxState { OutboxSummary.classify(outbox) }
 
     private var visible: [Note] { vm.visibleNotes(candidates) }
     private var snoozedNotDue: [Note] { vm.snoozedNotDue(candidates) }
@@ -57,16 +69,6 @@ struct TriageRootView: View {
         }
         .overlay { if visible.isEmpty { emptyState } }
         .navigationTitle("Triage (\(visible.count))")
-        .toolbar {
-            if !outbox.isEmpty {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button(action: exportKept) {
-                        Label("Export \(outbox.count) to Notes", systemImage: "square.and.arrow.up")
-                    }
-                    .disabled(isExporting)
-                }
-            }
-        }
         .navigationDestination(for: Note.self) { note in
             NoteEditorView(note: note,
                            onKeep: { keep($0) },
@@ -74,7 +76,12 @@ struct TriageRootView: View {
                            onDiscard: { discard($0) })
         }
         .safeAreaInset(edge: .bottom) {
-            if bannerNoteID != nil { undoBanner }
+            // The transient undo banner wins the inset while it's up; otherwise the
+            // steady-state export bar shows only when there's residue to act on.
+            if bannerNoteID != nil { undoBanner } else { exportBar }
+        }
+        .fileImporter(isPresented: $showingVaultPicker, allowedContentTypes: [.folder]) { result in
+            if case .success(let url) = result { setVaultAndDrive(url) }
         }
         .onAppear { refreshToken += 1 }
         .onChange(of: scenePhase) { _, phase in
@@ -126,27 +133,111 @@ struct TriageRootView: View {
         .accessibilityLabel("Note discarded. Undo available.")
     }
 
+    /// The steady-state export residue bar (counts-only). Absent when the funnel is
+    /// clear (`.empty`) or notes are silently auto-exporting (`.draining`); present
+    /// only when the owner must act — set up the vault, re-grant, or retry.
+    @ViewBuilder private var exportBar: some View {
+        switch outboxState {
+        case .needsSetup(let n):
+            exportBarButton("Set up vault to export \(n)", systemImage: "folder.badge.plus") {
+                showingVaultPicker = true
+            }
+        case .stuck(let n, .accessLost):
+            exportBarButton("Reconnect your vault · \(n) waiting", systemImage: "arrow.clockwise.icloud") {
+                showingVaultPicker = true
+            }
+        case .stuck(let n, _):
+            exportBarButton("Retry \(n)", systemImage: "arrow.clockwise") { driveExport() }
+        case .empty, .draining:
+            EmptyView()
+        }
+    }
+
+    private func exportBarButton(_ title: String, systemImage: String,
+                                 action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: systemImage)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+        }
+        .buttonStyle(.borderedProminent)
+        .disabled(isExporting)
+        .padding(.horizontal)
+        .padding(.bottom, 8)
+    }
+
     // MARK: - Actions
 
-    private func keep(_ note: Note) { vm.keep(note, in: context) }
+    /// Keep → auto-export to Obsidian (hybrid). The note writes to the vault and
+    /// leaves silently; if no vault is set up yet it lands as `pending(noVaultConfigured)`
+    /// and the bottom bar invites a deliberate "Set up vault" — the picker never
+    /// interrupts the keep swipe itself.
+    private func keep(_ note: Note) {
+        vm.keep(note, in: context)
+        autoExport()
+    }
     private func snooze(_ note: Note) { vm.snooze(note, in: context) }
 
-    /// Batch-export the outbox (Kept + failed-pending) in one action, via the Apple
-    /// Notes share sheet (Slice 5 intermediate destination). Confirmed notes leave
-    /// the app; any that fail stay in the outbox (their count persists — honest).
-    private func exportKept() {
+    /// Fire-and-forget silent export of the freshly-kept notes. Race-safe without
+    /// locking: the coordinator marks notes `.writing` and saves before awaiting, and
+    /// `autoExportKept` only fetches `.kept`, so overlapping runs can't double-claim.
+    private func autoExport() {
+        Task { await ExportCoordinator(destination: obsidian).autoExportKept(in: context) }
+    }
+
+    /// Deliberate drain (Retry / after vault setup): retries `pending` and drains any
+    /// `kept`. Disables the bar while in flight and announces the outcome.
+    private func driveExport() {
         guard !isExporting else { return }
-        finalizePendingDiscard()      // don't strand a mid-flight discard behind the sheet
+        finalizePendingDiscard()
         isExporting = true
         Task {
-            let coordinator = ExportCoordinator(destination: AppleNotesDestination())
-            let confirmed = await coordinator.exportAll(in: context)
+            let confirmed = await ExportCoordinator(destination: obsidian).exportAll(in: context)
             isExporting = false
-            if confirmed > 0 {
-                let noun = confirmed == 1 ? "note" : "notes"
-                AccessibilityNotification.Announcement("Exported \(confirmed) \(noun).").post()
-            }
+            announceExportResult(confirmed: confirmed)
         }
+    }
+
+    /// Persist the freshly-picked vault folder, then drain everything waiting on it
+    /// (`pending(.noVaultConfigured)` / `.accessLost` + any kept). Same picker serves
+    /// first-time setup and re-grant.
+    private func setVaultAndDrive(_ url: URL) {
+        do {
+            try VaultAccess(store: vaultStore).setVault(pickedURL: url)
+            driveExport()
+        } catch {
+            // Couldn't claim access to the picked folder — notes stay pending; the bar
+            // remains so the owner can try again. (Device-only failure path.)
+        }
+    }
+
+    private func announceExportResult(confirmed: Int) {
+        if confirmed > 0 {
+            let noun = confirmed == 1 ? "note" : "notes"
+            AccessibilityNotification.Announcement("Exported \(confirmed) \(noun).").post()
+        }
+        // Announce the residue (fresh fetch — the @Query hasn't re-rendered yet).
+        switch currentOutboxState() {
+        case .needsSetup:
+            AccessibilityNotification.Announcement("Vault not set up yet.").post()
+        case .stuck(let n, .accessLost):
+            AccessibilityNotification.Announcement("Couldn't reach your vault. \(n) waiting to reconnect.").post()
+        case .stuck(let n, _):
+            AccessibilityNotification.Announcement("\(n) still need attention.").post()
+        case .empty, .draining:
+            break
+        }
+    }
+
+    /// Classify a *fresh* fetch of the outbox — used right after an export completes,
+    /// before the `@Query` has re-rendered, so an announcement reflects the real state.
+    private func currentOutboxState() -> OutboxState {
+        let kept = NoteStatus.kept.rawValue
+        let pending = NoteStatus.pending.rawValue
+        let descriptor = FetchDescriptor<Note>(
+            predicate: #Predicate { $0.statusRaw == kept || $0.statusRaw == pending }
+        )
+        return OutboxSummary.classify((try? context.fetch(descriptor)) ?? [])
     }
 
     private func discard(_ note: Note) {
