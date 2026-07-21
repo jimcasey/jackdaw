@@ -5,7 +5,7 @@
 > does **not** follow you to another machine or a cloud session (see "What travels"
 > below). Refresh this file with `/handoff` before switching sessions.
 
-**Last updated:** 2026-07-18 (adopted PR-based dev workflow — see `docs/dev-workflow.md`).
+**Last updated:** 2026-07-21 (dev workflow is now PR-based + Xcode Cloud CI/CD is live — see `docs/dev-workflow.md`, ADR 0006).
 
 ---
 
@@ -15,6 +15,12 @@ Jackdaw is an iOS quick-capture inbox (Capture → Triage → Export to Obsidian
 Building in thin end-to-end slices per the de-risking rule. **Both the scariest
 risks are already retired:** the iOS toolchain/TestFlight path (Slice 0) and the
 Obsidian vault-write architecture (Slice 1, proven on a real device).
+
+**New since the last handoff — how we work changed (no product code changed):**
+the project now lands changes via **pull request, not direct pushes to `main`**,
+with **tripod checkpoint reviews**, and a **live Xcode Cloud CI/CD pipeline**
+(PR CI on PRs + automated TestFlight on merge). Details below and in
+`docs/dev-workflow.md`. The next *product* slice (Slice 6) has not started.
 
 ### Slice progress
 
@@ -37,7 +43,8 @@ files are the detailed specs.
 ### What's built vs. not
 - **Built:** capture (autosave-as-you-type, sheet), Triage inbox with the three
   actions + deferred-delete undo + calendar-day snooze + light editing, location
-  attachment. 33 unit tests pass.
+  attachment. **33 unit tests pass** (unchanged this session — no product code
+  changed; verify with the recipe below).
 - **Not built yet — the export half:** the `Jackdaw/Talon/` core (`ExportDestination`,
   `VaultBookmarkStore`, `VaultAccess`, `FolderWriter`, `ObsidianFolderDestination`,
   `ExportFailure`) exists from Slice 1 but is currently **unused** (the `VaultProofView`
@@ -51,7 +58,17 @@ Spec **Slice 6 — Apple Notes export** via the tech-lead (pattern: tech-lead wr
 `docs/slices/slice-6-*.md`, then implement + verify). It proves the export pipeline
 (serializer + retention state machine above the `ExportDestination` seam) against an
 easy destination before Slice 7 wires the real Obsidian folder-write. Retention is
-**hold-until-sync-confirmed**.
+**hold-until-sync-confirmed**. **This will be the first *feature* slice to run through
+the new flow:** branch → `/open-pr` → `PR CI` + `/checkpoint-review` → merge →
+automatic TestFlight build.
+
+### Recently landed
+**PRs #1–#7 are all merged to `main`** — the PR-based workflow, the tripod-review
+setup, and the full **Xcode Cloud CI/CD pipeline** are in place and **validated
+on-device** (a real TestFlight build shipped after clearing a missing-icon rejection).
+The owner has applied the TestFlight **docs-only skip** (`docs/`, `.claude/`,
+`CLAUDE.md` excluded from the `TestFlight` start condition). No product code is in
+flight; the next work is Slice 6.
 
 ---
 
@@ -69,21 +86,29 @@ easy destination before Slice 7 wires the real Obsidian folder-write. Retention 
 | Snooze | Calendar-day boundary = session boundary; reappears next local day | `docs/slices/slice-4-triage.md`, `SnoozeSchedule.swift` |
 | Discard | Deferred hard-delete + undo banner (kill-safe toward keep) | `docs/slices/slice-4-triage.md` |
 | Location | Precise GPS, in-app only; priming sheet kept, reduced-accuracy nudge cut, place names lazy-at-display | `docs/slices/slice-5-location.md` |
-| CI / distribution | **Xcode Cloud** (Accepted) — 2 phased owner-configured workflows; internal testers only; agent never triggers/reconfigures cloud builds. **Phase 1 LIVE**: `PR CI` (build + `JackdawTests` on PR-to-`main`) green & a required check. **Phase 2 repo prep done** (`ci_scripts/ci_post_clone.sh` = build number; export-compliance key); owner wires the `TestFlight` workflow (Archive on merge-to-`main`) per the runbook. | ADR 0006, `docs/ci/xcode-cloud-setup.md` |
+| **Dev workflow** | **PRs, not direct pushes to `main`.** Branch → `/open-pr` → `/checkpoint-review` (reuse the tripod + built-in `/code-review`, no separate reviewer agent) → merge. ADRs land as their own PR first; specs/persona-memory ride with the code. | `docs/dev-workflow.md` |
+| **CI / distribution** | **Xcode Cloud — LIVE.** `PR CI` (build + `JackdawTests` on PR-to-`main`) is a **required status check**; `TestFlight` (archive + distribute to Internal Testing on merge-to-`main`, docs-only merges skipped) is validated on-device. Internal testers only. Agent never triggers/reconfigures cloud builds. | ADR 0006, `docs/ci/xcode-cloud-setup.md` |
 
 Full scope in `docs/prd/mvp-scope.md`. Governing principle: **funnel, not archive** —
 notes flow Capture → Triage → Export and leave; "home is never a growing browsable
 library." No browsing/search/history of exported notes.
 
-**Open/deferred:** the **marketable name is still TBD** (not decided). "Jackdaw" is
-taken on the App Store, so the store display name is a placeholder **"JackdawNotes"**;
-the codename `Jackdaw` and bundle ID `com.jimcodes.Jackdaw` are unaffected. Revisit
-near release — a product-lead call. See `.claude/agent-memory/product-lead/project_marketable-name.md`.
+**Open/deferred (do not treat as settled):**
+- **Marketable name is still TBD.** "Jackdaw" is taken on the App Store, so the
+  store display name is a placeholder **"JackdawNotes"**; the codename `Jackdaw` and
+  bundle ID `com.jimcodes.Jackdaw` are unaffected. Revisit near release — a
+  product-lead call. See `.claude/agent-memory/product-lead/project_marketable-name.md`.
+- **App icon is a placeholder** (charcoal + pale circle, added to fix a TestFlight
+  ITMS icon-missing rejection). Needs a real design — a design-lead/branding task,
+  alongside the name. File: `Jackdaw/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`.
+- **Discard-undo banner** was shipped (Slice 4); the older "open call" in
+  `docs/build-order.md` is settled.
 
 ---
 
 ## How to build & verify (learned the hard way)
 
+### Local (the inner loop — unchanged)
 - **Full Xcode is at `/Applications/Xcode.app`** (26.x). The default `xcode-select`
   points at CommandLineTools, so CLI builds need:
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`
@@ -91,22 +116,51 @@ near release — a product-lead call. See `.claude/agent-memory/product-lead/pro
   ```
   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
     -scheme Jackdaw -destination 'platform=iOS Simulator,name=iPhone 17' \
-    -only-testing:JackdawTests -derivedDataPath <scratch>
+    -only-testing:JackdawTests -derivedDataPath /tmp/jackdaw-derived
   ```
+  (Use a real `-derivedDataPath` — a literal `<placeholder>` trips zsh's redirect
+  parsing. `Jackdaw` is now a **shared** scheme whose Test action is scoped to
+  `JackdawTests` only.)
 - **Build only:** `xcodebuild build -scheme Jackdaw -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath <scratch>`
-- **STALE-BUILD GOTCHA:** multiple DerivedData dirs exist (Xcode's + CLI). A bare
-  `find … Jackdaw.app | head -1` can grab an **old** build (symptom: the app shows
-  the default "Hello, world!" template). Always build with an explicit
-  `-derivedDataPath` and install THAT `.app` for a simulator launch/screenshot.
+- **STALE-BUILD GOTCHA:** multiple DerivedData dirs exist (Xcode's + CLI). Always
+  build with an explicit `-derivedDataPath` and install THAT `.app`.
 - **Sim launch/screenshot:** `xcrun simctl install/launch/io "iPhone 17" …`;
   bundle id **`com.jimcodes.Jackdaw`**. Grant location:
   `xcrun simctl privacy "iPhone 17" grant location com.jimcodes.Jackdaw`; set a
   coordinate: `xcrun simctl location "iPhone 17" set <lat>,<lon>`.
 - **Can't be automated headlessly (owner must check on sim/device):** typing a note,
-  swipe gestures, permission prompts, real precise GPS, TestFlight/signing. Unit
-  tests cover the logic; the owner drives the UI.
-- **iOS toolchain reality:** building, signing, TestFlight, and Instruments happen in
-  **Xcode** — that context switch is unavoidable.
+  swipe gestures, permission prompts, real precise GPS, TestFlight/signing.
+
+### CI/CD (Xcode Cloud — LIVE; owner-configured in App Store Connect)
+- **`PR CI`** — on Pull Request → `main`: builds `Jackdaw` + runs `JackdawTests`
+  (~3 min). It is a **required status check**, so no PR merges red. Runs on all PRs
+  (docs included — deliberately; skipping conflicts with the required-check).
+- **`TestFlight`** — on merge → `main`: archives (Release) + distributes to
+  **TestFlight Internal Testing** (owner's device). ~15–20 min. Skips docs-only
+  merges (`docs/`, `.claude/`, `CLAUDE.md` excluded).
+- **Repo pieces that make CI/CD work:** shared `Jackdaw.xcscheme` (Test = `JackdawTests`
+  only), `ci_scripts/ci_post_clone.sh` (unique build number), app-target
+  `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO`, and the app icon. No other
+  `ci_scripts` — the project has no external deps.
+- **Guardrails:** cloud compute is a finite owner-managed quota (25 h/mo free; real
+  use ≈ a few hours). **The agent never triggers or reconfigures Xcode Cloud
+  workflows** — builds are a consequence of git events the owner configured. Full
+  setup runbook + gotchas: `docs/ci/xcode-cloud-setup.md`.
+- **Version note:** `MARKETING_VERSION` is **1.0.1** (bumped past Slice 0's manual
+  `1.0 (2)`); `ci_post_clone.sh` stamps the build number.
+
+---
+
+## Development workflow (how changes land)
+
+- **PRs, not direct pushes to `main`.** `main` is branch-protected and stays green.
+- **Flow:** branch → commit → `/open-pr` → `PR CI` + `/checkpoint-review` → merge.
+- **Commands:** `/open-pr` (scaffold a PR from the branch), `/checkpoint-review`
+  (route the diff to the relevant tripod personas + built-in `/code-review`),
+  `/handoff`, `/adr`, `/prd`.
+- **Recording decisions:** a real architectural decision gets its **own ADR PR
+  first**; persona-memory + slice specs ride **in the same PR** as the code.
+- Full process: `docs/dev-workflow.md`.
 
 ---
 
@@ -114,26 +168,28 @@ near release — a product-lead call. See `.claude/agent-memory/product-lead/pro
 
 Three subagents in `.claude/agents/` — `product-lead`, `design-lead`, `tech-lead` —
 own why/what, experience, and how respectively. Invoke by name ("have the tech-lead
-spec Slice 6"). Their memory lives in `.claude/agent-memory/` and **is committed**,
-so a fresh session's personas reload their state. Prior *agent instances* don't
-survive a session move, but they rebuild from that memory — just re-invoke them.
+spec Slice 6"). They also staff PR reviews, each on its dimension. Their memory lives
+in `.claude/agent-memory/` and **is committed**, so a fresh session's personas reload
+their state — just re-invoke them.
 
 ---
 
 ## What travels to a new/remote session — and what doesn't
 
 **Travels (in git):** `CLAUDE.md`, everything in `docs/` (PRD, ADRs, design,
-build-order, slices, this file), `.claude/agent-memory/`, `.claude/agents/`,
-`.claude/commands/`, all code + tests.
+build-order, slices, dev-workflow, ci runbook, this file), `.claude/agent-memory/`,
+`.claude/agents/`, `.claude/commands/`, all code + tests, the shared `.xcscheme`,
+and `ci_scripts/`.
 
 **Does NOT travel (machine-local):**
-- Claude Code's per-project auto-memory at `~/.claude/projects/-Users-jim-Code-jackdaw/memory/`
-  (its `MEMORY.md` + fact files). This STATUS.md is the in-repo replacement for it.
-- The conversation transcript (local `.jsonl`). A remote session starts fresh — this
-  file is how it gets oriented.
+- Claude Code's per-project auto-memory. This STATUS.md is the in-repo replacement.
+- The conversation transcript. A remote session starts fresh — this file orients it.
 - Local build scratch (DerivedData) — disposable.
+- **Xcode Cloud workflow config** lives in **App Store Connect**, not the repo — it's
+  owner-managed and already set up (both workflows). See the runbook.
 
-**Before switching sessions:** run `/handoff` to refresh this file, then
-**commit and push your branch and open/update its PR** — a remote/cloud session
-only sees pushed commits, and as of 2026-07-18 changes land via PR, not direct
-pushes to `main` (see `docs/dev-workflow.md`).
+**Before switching sessions:** run `/handoff` to refresh this file, then **commit and
+push your branch and open/update its PR** — a remote/cloud session only sees pushed
+commits, and changes land via PR, not direct pushes to `main` (see
+`docs/dev-workflow.md`). The build environment on the far side needs **Xcode 26.x +
+the iOS 26 SDK** to build/verify.
