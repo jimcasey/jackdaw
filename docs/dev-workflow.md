@@ -138,9 +138,9 @@ workflows, each a distinct gate. Full setup + owner runbook:
   *correctness* gate beside the tripod's *judgment* review — no PR merges red.
 - **`TestFlight` — on merge to `main`:** archives (Release) and distributes to
   **TestFlight Internal Testing** (owner's device). Every **code** merge (ADR 0006
-  Decision 1), ~15–20 min; docs/prose-only merges (`docs/`, `.claude/`) are skipped
-  via a Files & Folders start condition — see the runbook. Cloud-managed signing
-  handles the distribution cert.
+  Decision 1), ~15–20 min; docs/prose-only merges (`docs/`, `.claude/`, `CLAUDE.md`)
+  are skipped via a Files & Folders start condition — see the runbook. Cloud-managed
+  signing handles the distribution cert.
 
 **Repo pieces that make this work** (all landed via PR): the shared `Jackdaw`
 scheme (`.xcscheme`, Test action = `JackdawTests` only), `ci_scripts/ci_post_clone.sh`

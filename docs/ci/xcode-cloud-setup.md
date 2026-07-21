@@ -157,9 +157,16 @@ a redundant TestFlight build. Exclude them:
 
 On the `TestFlight` workflow's **Branch Changes → `main`** start condition, add a
 **Files and Folders** custom condition set to **"Don't start a build"** for
-changes confined to **`docs/`** and **`.claude/`**. A merge touching only those
-paths is skipped; any change under `Jackdaw/`, the `.xcodeproj`, or `ci_scripts/`
-still builds.
+**`docs/`**, **`.claude/`**, and the root **`CLAUDE.md`** (the doc/prose paths). A
+merge touching only those is skipped; any change under `Jackdaw/`, the
+`.xcodeproj`, or `ci_scripts/` still builds.
+
+> **`.claude/` is hidden** (a dotfolder) in the file picker — press **⌘⇧.**
+> (Command-Shift-period) to reveal hidden items, then select it. Don't forget the
+> root **`CLAUDE.md`** file, which a folder-only exclusion would miss. Equivalent
+> alternative that avoids the hidden folder entirely: instead of excluding the
+> doc paths, set **"Start a build"** for the code folders only — `Jackdaw/`,
+> `Jackdaw.xcodeproj/`, `ci_scripts/`.
 
 **Why this is safe here but we did *not* do it for `PR CI`:** `TestFlight` is not
 a required status check, so skipping a docs-only merge has no side effect. `PR CI`
