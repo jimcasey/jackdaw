@@ -5,22 +5,23 @@
 > does **not** follow you to another machine or a cloud session (see "What travels"
 > below). Refresh this file with `/handoff` before switching sessions.
 
-**Last updated:** 2026-07-21 (dev workflow is now PR-based + Xcode Cloud CI/CD is live — see `docs/dev-workflow.md`, ADR 0006).
+**Last updated:** 2026-07-22 — **🎉 v1 is FEATURE-COMPLETE and validated on-device.**
 
 ---
 
 ## Where we are
 
-Jackdaw is an iOS quick-capture inbox (Capture → Triage → Export to Obsidian).
-Building in thin end-to-end slices per the de-risking rule. **Both the scariest
-risks are already retired:** the iOS toolchain/TestFlight path (Slice 0) and the
-Obsidian vault-write architecture (Slice 1, proven on a real device).
+Jackdaw is an iOS quick-capture inbox: **Capture → Triage → Export to Obsidian**.
+Built in thin end-to-end slices per the de-risking rule.
 
-**New since the last handoff — how we work changed (no product code changed):**
-the project now lands changes via **pull request, not direct pushes to `main`**,
-with **tripod checkpoint reviews**, and a **live Xcode Cloud CI/CD pipeline**
-(PR CI on PRs + automated TestFlight on merge). Details below and in
-`docs/dev-workflow.md`. The next *product* slice (Slice 6) has not started.
+**v1 is feature-complete and validated on the owner's iPhone.** The full funnel
+works end to end on-device: a kept note is written into the Obsidian vault,
+**byte-verified**, deleted from Jackdaw, and syncs to Obsidian. Both bottom
+confirmations were confirmed on-device — **"Saved to Obsidian"** on keep and the
+**"Note discarded — Undo"** banner on discard. All feature slices (0–7) are merged
+to `main` through the PR + tripod-review flow, on a live **Xcode Cloud CI/CD**
+pipeline (`PR CI` on PRs, automated TestFlight on merge). What remains is optional
+**v1.x** polish (below), not v1 work.
 
 ### Slice progress
 
@@ -33,7 +34,7 @@ with **tripod checkpoint reviews**, and a **live Xcode Cloud CI/CD pipeline**
 | 4 | Real Triage inbox (Keep/Snooze/Discard, undo, editor) | ✅ done |
 | 5 | Location context (in-app precise GPS, async backfill) | ✅ done |
 | 6 | **Apple Notes export** (intermediate milestone) | ✅ merged (#9 + follow-up #11) |
-| 7 | **Obsidian export → v1 complete** | ▶ **implemented on branch, CI-testable core green; owes on-device verification** |
+| 7 | **Obsidian export → v1 complete** | ✅ **done, validated on-device** (#12; toast fix #13–#14) |
 
 **Numbering caveat:** implementation slice numbers run **one ahead** of the
 at-a-glance table in `docs/build-order.md` (the capture rework became its own
@@ -55,37 +56,35 @@ files are the detailed specs.
   `writing → pending` reconciliation (`ExportReconciler`), off-device tests for
   `ObsidianFolderDestination.writeBatch` (Slice 7's real path), and do/`catch` on the
   kill-safety save.
-- **Reused from Slice 1 (unchanged logic):** `VaultAccess`, `FolderWriter`,
-  `VaultBookmarkStore` — `ObsidianFolderDestination` now conforms to the new seam
-  (still wraps `FolderWriter` write+verify) and is **Slice 7's real destination**; the
-  `VaultProofView` harness stays parked/throwaway.
+- **Slice 7 — Obsidian export — MERGED (#12), validated on-device.** Triage points at
+  `ObsidianFolderDestination` (reuses `VaultAccess`/`FolderWriter`/`VaultBookmarkStore`
+  from Slice 1); **Hybrid** trigger (auto-export on Keep once a vault exists) +
+  **counts-only** surfacing via `OutboxSummary`; lazy vault setup + stale-bookmark
+  re-grant via one `.fileImporter`; `returnToInbox` escape; `ExportReconciler` runs at
+  launch **and** on foreground. A **"Saved to Obsidian"** confirmation (overlay toast +
+  VoiceOver announcement, #13–#14) is the at-a-glance "it reached the vault" signal.
+  `VaultProofView` deleted; `AppleNotesDestination` retained (unused) as the seam's
+  documented second adapter.
 
-### Immediate next step
-**Slice 7 — Obsidian export is implemented on the branch** (spec:
-`docs/slices/slice-7-obsidian-export.md`). Owner decided: **Hybrid** export trigger
-(auto-export on Keep once a vault exists; first Keep with no vault waits for a
-deliberate "Set up vault"; failures rest until Retry/Re-grant) + **counts-only**
-surfacing. Triage now points at `ObsidianFolderDestination`; `keep()` auto-exports;
-`RootView` drains lingering `kept` at launch; the reason-driven **bottom bar** (Set up
-/ Re-grant / Retry) replaces the old Apple Notes button; `VaultProofView` deleted.
-New CI-tested logic: `OutboxSummary` classifier + `returnToInbox` + `autoExportKept`.
-
-**The `PR CI` green is NOT "done" for this slice** — it only proves the classifier,
-the transition, and that the reused pipeline holds. **The v1 acceptance bar is an
-owner on-device checklist** (spec §10): the document-picker vends a persistently
-writable bookmark from the real lazy trigger; the bookmark survives a cold relaunch;
-a verified `.md` lands in Obsidian on both devices via Sync; **re-grant** recovers a
-stale bookmark (hardest to test — force it via "clear vault"/rename the folder);
-VoiceOver announces; the bottom bar doesn't collide with the undo banner. After that
-passes on-device, **v1 is feature-complete.**
+### Immediate next step — v1 is done
+No remaining v1 work. Optional **v1.x** items (all deferred, none blocking), rough
+priority:
+- **Real app icon + marketable name** — replace the placeholder icon and the
+  "JackdawNotes" store name (branding: product-lead + design-lead). See "Open/deferred".
+- **Reduce-Motion gating** for the toast / undo-banner transitions — design-lead polish
+  (neither is gated on `accessibilityReduceMotion`; flagged in the #13 review).
+- **Per-note stuck list** — only if the counts-only outbox proves too blunt in real
+  use; `returnToInbox` logic already ships, just needs the list UI.
+- **External capture surfaces** (Action button / Shortcuts / widget) via a
+  `CaptureNoteIntent` over the existing `CaptureService` seam — deferred per ADR 0005.
 
 ### Recently landed
-**PRs #1–#7 are all merged to `main`** — the PR-based workflow, the tripod-review
-setup, and the full **Xcode Cloud CI/CD pipeline** are in place and **validated
-on-device** (a real TestFlight build shipped after clearing a missing-icon rejection).
-The owner has applied the TestFlight **docs-only skip** (`docs/`, `.claude/`,
-`CLAUDE.md` excluded from the `TestFlight` start condition). No product code is in
-flight; the next work is Slice 6.
+**PRs #1–#15 are all merged to `main`.** The v1 funnel shipped across the feature
+slices — Apple Notes export (#9, follow-up #11) → Obsidian export (#12), with the
+"Saved to Obsidian" confirmation + its render fix (#13–#14). The dev workflow itself
+was hardened: **auto-open PRs** and a **durable 5-minute CI check-back** (#10, #15;
+session-only crons were silently dying on the remote runner — see `docs/dev-workflow.md`).
+The Obsidian export path and both confirmations are **confirmed working on-device.**
 
 ---
 
@@ -122,8 +121,8 @@ library." No browsing/search/history of exported notes.
   `docs/build-order.md` is settled.
 
 ### Field notes — on-device issues (watch for recurrence)
-- **2026-07-21 — Obsidian export: notes silently stuck in-app, not written, NO bar
-  (UNRESOLVED root cause; not currently reproducible).** During the first Slice 7
+- **2026-07-21 → largely RESOLVED 2026-07-22 — Obsidian export "not landing" on the
+  first on-device pass.** During the first Slice 7
   on-device pass, kept notes did **not** appear in Obsidian **nor in the Files app**
   (so nothing was written — *not* an Obsidian external-refresh/display issue, which
   was explicitly ruled out), and Jackdaw showed **no export bar**. The notes were
@@ -142,6 +141,16 @@ library." No browsing/search/history of exported notes.
     visible (*no toast = nothing landed*); (2) the interrupted-write reconciler now
     also runs **on foreground** (was cold-launch only), so a stranded `.writing` note
     resurfaces as a Retry bar without needing a relaunch.
+  - **Resolution (2026-07-22):** on a later on-device pass, export **works** — notes
+    write to the vault and sync to Obsidian. Two things had made it *look* broken:
+    (a) the **"Saved to Obsidian" toast wasn't rendering** (a separate UI bug — the
+    transient shared the bottom inset and didn't surface; fixed in #14 by moving it to
+    an overlay, **confirmed on-device**), so there was no positive signal that anything
+    happened; and (b) the original stuck notes traced to a **vault-folder setup
+    mismatch**, cleared by the rename + Retry. The exact first-pass trigger was never
+    reproduced, so keep the fingerprint below — but the failure mode is now **guarded**:
+    a confirmed write shows the toast (*no toast = nothing landed*), and the reconciler
+    runs on foreground as well as launch.
   - **If it recurs:** capture the export bar text (if any), whether the `.md` is in
     the Files app at the picked folder, and the vault-setup state; consider adding a
     temporary on-screen diagnostic (resolved vault path + last export outcome/error).
@@ -163,6 +172,9 @@ library." No browsing/search/history of exported notes.
   (Use a real `-derivedDataPath` — a literal `<placeholder>` trips zsh's redirect
   parsing. `Jackdaw` is now a **shared** scheme whose Test action is scoped to
   `JackdawTests` only.)
+- **Test count:** **76 `@Test` cases** as of 2026-07-22 (green on `PR CI`) —
+  ExportTests 43, TriageTests 9, CaptureViewModelTests 8, LocationTests 6,
+  Slice1VaultTests 6, CaptureServiceTests 3, JackdawTests 1.
 - **Build only:** `xcodebuild build -scheme Jackdaw -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath <scratch>`
 - **STALE-BUILD GOTCHA:** multiple DerivedData dirs exist (Xcode's + CLI). Always
   build with an explicit `-derivedDataPath` and install THAT `.app`.
