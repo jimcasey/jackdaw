@@ -85,12 +85,15 @@ struct TriageRootView: View {
                            onDiscard: { discard($0) })
         }
         .safeAreaInset(edge: .bottom) {
-            // Priority: the transient undo banner wins while it's up; then a brief
-            // "Saved to Obsidian" confirmation; otherwise the steady-state export bar
-            // (only when there's residue to act on).
-            if bannerNoteID != nil { undoBanner }
-            else if let message = exportConfirmation { confirmationToast(message) }
-            else { exportBar }
+            // Persistent chrome only: the undo banner wins while it's up, else the
+            // steady-state export bar (shown only when there's residue to act on).
+            if bannerNoteID != nil { undoBanner } else { exportBar }
+        }
+        // The "Saved to Obsidian" confirmation is a transient, non-interactive overlay
+        // — deliberately NOT in the shared inset, which didn't reliably surface it when
+        // set from the async export Task as a note's row was leaving the list.
+        .overlay(alignment: .bottom) {
+            if let message = exportConfirmation { confirmationToast(message) }
         }
         .fileImporter(isPresented: $showingVaultPicker, allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result { setVaultAndDrive(url) }
@@ -164,8 +167,9 @@ struct TriageRootView: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 10)
             .background(.thinMaterial, in: Capsule())
-            .padding(.bottom, 8)
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .padding(.bottom, 24)            // float above the home indicator / any bar
+            .transition(.opacity)            // plain fade — never positions off-screen
+            .allowsHitTesting(false)         // a confirmation must not block the list
             .accessibilityHidden(true)
     }
 
