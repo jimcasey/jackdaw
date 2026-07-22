@@ -532,15 +532,13 @@ web:
 - **Navigation = two-tab `Capture | Triage`.**
 - **Stack: iOS 26 target (ADR 0002) + SwiftData (ADR 0003).**
 
-**Still open — flagged for a later owner call (do not resolve now):**
-- **Discard-undo banner** (Slice 4). Design-lead wants it (mis-tap safety net);
-  tech-lead resisted (friction/complexity vs. the fast keep-kill rhythm). Deferred
-  to **settle when Discard is built at Slice 4**, since it only becomes concrete
-  there.
-- **App Store vs. TestFlight-forever** (Slice 0 note). For a single-user tool I
-  recommend deferring App Store submission indefinitely (TestFlight, with its
-  90-day re-upload cadence, as the delivery channel). Not urgent; revisit only if
-  distribution goals change.
+**Open calls — now settled or tracked in GitHub Issues:**
+- **Discard-undo banner** (Slice 4) — **shipped**. It landed in Slice 4; the
+  design-lead (mis-tap safety net) / tech-lead (friction) tension resolved in favor of
+  the banner.
+- **App Store vs. TestFlight-forever** (Slice 0 note) — moved to GitHub Issues (**#24**).
+  Recommendation on record: for a single-user tool, defer App Store submission
+  indefinitely and treat TestFlight (90-day re-upload cadence) as the channel. Not urgent.
 
 **Residual note (not a blocker):** capture is usable in the wild by Slice 3; the
 funnel only *closes* at export (Slice 6). If the product-lead wants captured

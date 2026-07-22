@@ -5,6 +5,12 @@
 > assumptions behind it, the build dependency, and where I expect push-back.
 > Reads with `navigation-and-screen-inventory.md` and
 > `capture-and-triage-flows.md`.
+>
+> **Update (2026-07-22):** these threads are **largely resolved and shipped** — they
+> drove the v1 design. This doc is retained as **design rationale** (the "why"), not as
+> a live backlog. The residual *open* items have moved to GitHub Issues: the snooze
+> anti-graveyard nudge (#22) and midnight-boundary refinement (#23) from Thread 1, and
+> the per-note stuck-list fallback (#20) from Thread 4.
 
 The five threads: **snooze-session model**, **first-run vault setup**, **vault
 re-grant recovery**, **pending/failed export surfacing**, **precise-location
