@@ -90,6 +90,19 @@ open a PR unless asked" posture for this repo.
    owner arbitrates) — the agent stops babysitting and hands back, rather than
    re-polling a PR that has nothing left to watch.
 
+   > **How the re-check is scheduled — use a DURABLE Routine, not a session cron
+   > (learned the hard way 2026-07-22).** GitHub webhooks (`subscribe_pr_activity`)
+   > deliver CI **failures** and comments but **not CI success / new pushes / merge**,
+   > so the green/yellow re-check needs a *scheduled* wake-up. Schedule it with a
+   > **durable Routine** — the claude-code-remote `send_later` / `create_trigger`
+   > (self-bound to the session) — which is **server-persisted and survives the remote
+   > container being reclaimed** between messages. Do **NOT** use session-only
+   > `CronCreate`: on the web/remote runner the session idles and is reclaimed between
+   > turns (gaps of hours or days), which **silently wipes in-memory cron jobs before
+   > they ever fire** — the re-check just never happens and the owner has to poll
+   > green by hand. If the Routine's MCP server is momentarily disconnected, say so and
+   > retry when it reconnects — never fall back to a cron that won't persist.
+
 3. **This does not change the cloud-spend guardrails below.** The agent still never
    *triggers* or reconfigures Xcode Cloud; CI runs are a consequence of the
    owner-configured PR/merge triggers. Auto-opening a PR is the one git event the
