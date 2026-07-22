@@ -172,6 +172,9 @@ library." No browsing/search/history of exported notes.
   (Use a real `-derivedDataPath` — a literal `<placeholder>` trips zsh's redirect
   parsing. `Jackdaw` is now a **shared** scheme whose Test action is scoped to
   `JackdawTests` only.)
+- **Test count:** **76 `@Test` cases** as of 2026-07-22 (green on `PR CI`) —
+  ExportTests 43, TriageTests 9, CaptureViewModelTests 8, LocationTests 6,
+  Slice1VaultTests 6, CaptureServiceTests 3, JackdawTests 1.
 - **Build only:** `xcodebuild build -scheme Jackdaw -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath <scratch>`
 - **STALE-BUILD GOTCHA:** multiple DerivedData dirs exist (Xcode's + CLI). Always
   build with an explicit `-derivedDataPath` and install THAT `.app`.
