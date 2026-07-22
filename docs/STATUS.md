@@ -121,6 +121,31 @@ library." No browsing/search/history of exported notes.
 - **Discard-undo banner** was shipped (Slice 4); the older "open call" in
   `docs/build-order.md` is settled.
 
+### Field notes — on-device issues (watch for recurrence)
+- **2026-07-21 — Obsidian export: notes silently stuck in-app, not written, NO bar
+  (UNRESOLVED root cause; not currently reproducible).** During the first Slice 7
+  on-device pass, kept notes did **not** appear in Obsidian **nor in the Files app**
+  (so nothing was written — *not* an Obsidian external-refresh/display issue, which
+  was explicitly ruled out), and Jackdaw showed **no export bar**. The notes were
+  still *in Jackdaw* (hold-until-confirmed protected them). It **healed** after the
+  owner renamed the destination folder, kept a new note, saw a **"Retry"** bar, and
+  tapped it — a deliberate `exportAll` that drained *all* the stuck notes into the
+  (renamed) folder; auto-export on subsequent keeps then worked.
+  - **What that fingerprint means:** a note invisible with no bar is stuck either
+    `.kept` (→ `OutboxSummary.draining` → silent by design) or `.writing` (excluded
+    from *every* `@Query`). So **auto-export-on-keep did not write and did not advance
+    the note to a `pending` failure** (which would have shown a bar). Leading
+    hypotheses: a stale/never-configured vault bookmark that auto-export hit without
+    surfacing; or notes stranded `.writing` and never reconciled until a full relaunch.
+  - **Mitigations shipped in the follow-up PR:** (1) a **"Saved to Obsidian"**
+    confirmation toast on a verified write — so a silent non-export is now immediately
+    visible (*no toast = nothing landed*); (2) the interrupted-write reconciler now
+    also runs **on foreground** (was cold-launch only), so a stranded `.writing` note
+    resurfaces as a Retry bar without needing a relaunch.
+  - **If it recurs:** capture the export bar text (if any), whether the `.md` is in
+    the Files app at the picked folder, and the vault-setup state; consider adding a
+    temporary on-screen diagnostic (resolved vault path + last export outcome/error).
+
 ---
 
 ## How to build & verify (learned the hard way)

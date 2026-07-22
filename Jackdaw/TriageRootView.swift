@@ -36,6 +36,8 @@ struct TriageRootView: View {
     @State private var discardTask: Task<Void, Never>?
     @State private var isExporting = false
     @State private var showingVaultPicker = false
+    @State private var exportConfirmation: String?   // transient "Saved to Obsidian" toast
+    @State private var toastGeneration = 0           // guards the toast's dismiss timer
     @State private var refreshToken = 0   // bumped on appear/active to recompute due-ness
 
     private var outboxState: OutboxState { OutboxSummary.classify(outbox) }
@@ -83,18 +85,27 @@ struct TriageRootView: View {
                            onDiscard: { discard($0) })
         }
         .safeAreaInset(edge: .bottom) {
-            // The transient undo banner wins the inset while it's up; otherwise the
-            // steady-state export bar shows only when there's residue to act on.
-            if bannerNoteID != nil { undoBanner } else { exportBar }
+            // Priority: the transient undo banner wins while it's up; then a brief
+            // "Saved to Obsidian" confirmation; otherwise the steady-state export bar
+            // (only when there's residue to act on).
+            if bannerNoteID != nil { undoBanner }
+            else if let message = exportConfirmation { confirmationToast(message) }
+            else { exportBar }
         }
         .fileImporter(isPresented: $showingVaultPicker, allowedContentTypes: [.folder]) { result in
             if case .success(let url) = result { setVaultAndDrive(url) }
         }
         .onAppear { refreshToken += 1 }
         .onChange(of: scenePhase) { _, phase in
-            // Re-drive any lingering kept on foreground too (RootView drains at cold
-            // launch; this covers a note kept just before a background without a kill).
-            if phase == .active { refreshToken += 1; autoExport() }
+            // On foreground: recover any note stranded mid-write (writing → pending, so
+            // it surfaces as a Retry bar instead of staying invisible) and re-drive any
+            // lingering kept. RootView already does both at cold launch; this closes the
+            // background-without-kill window.
+            if phase == .active {
+                refreshToken += 1
+                ExportReconciler.reconcileInterruptedWrites(in: context)
+                autoExport()
+            }
         }
         .onDisappear { finalizePendingDiscard() }   // navigating to the editor commits a pending discard
     }
@@ -140,6 +151,22 @@ struct TriageRootView: View {
         .transition(.move(edge: .bottom).combined(with: .opacity))
         .accessibilityElement(children: .combine)
         .accessibilityLabel("Note discarded. Undo available.")
+    }
+
+    /// Brief, subtle "Saved to Obsidian" confirmation shown when notes are actually
+    /// written+verified into the vault. Positive feedback for the otherwise-silent
+    /// export — and a diagnostic: *no* toast means nothing landed. Hidden from
+    /// VoiceOver because both export paths announce separately (`announceSaved` on the
+    /// keep path, `announceExportResult` on the deliberate drain), so it isn't doubled.
+    private func confirmationToast(_ message: String) -> some View {
+        Label(message, systemImage: "checkmark.circle.fill")
+            .font(.subheadline)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.thinMaterial, in: Capsule())
+            .padding(.bottom, 8)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .accessibilityHidden(true)
     }
 
     /// The steady-state export residue bar (counts-only). Absent when the funnel is
@@ -209,8 +236,44 @@ struct TriageRootView: View {
     /// Fire-and-forget silent export of the freshly-kept notes. Race-safe without
     /// locking: the coordinator marks notes `.writing` and saves before awaiting, and
     /// `autoExportKept` only fetches `.kept`, so overlapping runs can't double-claim.
+    /// A confirmed write flashes the toast **and** announces to VoiceOver (the toast
+    /// is visual-only) — so a VO user gets the same "it landed" confidence.
     private func autoExport() {
-        Task { await ExportCoordinator(destination: obsidian).autoExportKept(in: context) }
+        Task {
+            let confirmed = await ExportCoordinator(destination: obsidian).autoExportKept(in: context)
+            showExportConfirmation(confirmed)
+            announceSaved(confirmed)
+        }
+    }
+
+    /// The confirmation copy — pure and testable so a "Saved…" toast can never claim a
+    /// write that didn't happen (`confirmed == 0` → no toast/announcement).
+    nonisolated static func exportConfirmationMessage(confirmed: Int) -> String? {
+        guard confirmed > 0 else { return nil }
+        return confirmed == 1 ? "Saved to Obsidian" : "Saved \(confirmed) to Obsidian"
+    }
+
+    /// Flash the visual "Saved to Obsidian" confirmation for ~2s, then clear. The
+    /// dismiss timer is generation-guarded so a rapid keep-keep-keep re-arms the
+    /// window instead of an older timer clearing a newer toast early.
+    private func showExportConfirmation(_ confirmed: Int) {
+        guard let message = Self.exportConfirmationMessage(confirmed: confirmed) else { return }
+        toastGeneration += 1
+        let generation = toastGeneration
+        withAnimation { exportConfirmation = message }
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            if generation == toastGeneration { withAnimation { exportConfirmation = nil } }
+        }
+    }
+
+    /// VoiceOver counterpart to the toast for the silent auto-export path — a single
+    /// concise utterance ("Saved to Obsidian"), success only (no residue: a Keep that
+    /// also left something stuck is rare and the bar carries that).
+    private func announceSaved(_ confirmed: Int) {
+        if let message = Self.exportConfirmationMessage(confirmed: confirmed) {
+            AccessibilityNotification.Announcement(message + ".").post()
+        }
     }
 
     /// Deliberate drain (Retry / after vault setup): retries `pending` and drains any
@@ -222,6 +285,7 @@ struct TriageRootView: View {
         Task {
             let confirmed = await ExportCoordinator(destination: obsidian).exportAll(in: context)
             isExporting = false
+            showExportConfirmation(confirmed)
             announceExportResult(confirmed: confirmed)
         }
     }
@@ -243,9 +307,8 @@ struct TriageRootView: View {
     /// `.post()`s clobber each other, so the failure half (the important one) got cut.
     private func announceExportResult(confirmed: Int) {
         var parts: [String] = []
-        if confirmed > 0 {
-            let noun = confirmed == 1 ? "note" : "notes"
-            parts.append("Exported \(confirmed) \(noun).")
+        if let saved = Self.exportConfirmationMessage(confirmed: confirmed) {
+            parts.append(saved + ".")
         }
         // Residue keys off a fresh fetch — the @Query hasn't re-rendered yet.
         switch currentOutboxState() {
