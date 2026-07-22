@@ -34,6 +34,17 @@ final class TriageViewModel {
         try? context.save()
     }
 
+    /// Send a stuck (`pending`) note back to the un-triaged inbox, out of the export
+    /// tail — the owner's escape hatch for a note they give up exporting. A plain
+    /// status reset, NOT a `RetentionMachine` event: re-triage is outside the
+    /// machine's kept…deleted domain. No-op on a non-`pending` note.
+    func returnToInbox(_ note: Note, in context: ModelContext) {
+        guard note.status == .pending else { return }
+        note.status = .inbox
+        note.exportFailureRaw = nil
+        try? context.save()
+    }
+
     /// Optimistically hide (do NOT delete yet). Delete is deferred to `commitDiscard`
     /// on banner expiry — kill-safe in the funnel's favor (a kill during the window
     /// leaves the note intact).
