@@ -75,14 +75,15 @@ open a PR unless asked" posture for this repo.
    `main` itself (description from the diff + linked slice/ADR, honoring any PR
    template — i.e. `/open-pr`). Opening early / as draft is fine.
 
-2. **Watch `PR CI` on a ~20-minute budget, then act on the color.** After opening
-   (or after any push to the branch), the agent checks the PR's status, waiting up
-   to ~20 minutes for a terminal result, and follows this decision flow:
+2. **Watch `PR CI` on a ~5-minute cadence, then act on the color.** After opening
+   (or after any push to the branch), the agent re-checks the PR's status about
+   every **~5 minutes** — a `PR CI` run takes ~5 min, so a longer interval just adds
+   dead time — and follows this decision flow:
 
    | CI color | Meaning | Agent action |
    |----------|---------|--------------|
    | 🟢 **Green** | Required checks passed | **Stop** — do **not** re-arm the check. Hand back to the owner for the next action (`/checkpoint-review`, merge). |
-   | 🟡 **Yellow** | Still running / pending, or the ~20-min budget elapsed with no terminal result | **Re-arm** the check and keep waiting. |
+   | 🟡 **Yellow** | Still building / pending (no terminal result yet) | **Re-arm** a ~5-min check and keep waiting. |
    | 🔴 **Red** | A required check failed | **Attempt to fix** — diagnose from the logs, push a fix to the branch (which restarts the cycle at step 2). If the failure is out of scope or resists a fix, report the diagnosis and where it's stuck. |
 
    "Green → wait for input" is deliberate: CI passing is a *correctness* gate, not
