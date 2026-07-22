@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import SwiftData
+import SwiftUI   // TriageRootView (View) is referenced for its pure static message helper
 @testable import Jackdaw
 
 // MARK: - NoteSerializer (pure value transform, no SwiftData)
@@ -550,5 +551,18 @@ struct AutoExportKeptTests {
         #expect(confirmed == 0)
         #expect(mock.received.isEmpty)
         #expect(try count(context) == 1)                 // the writing note is untouched
+    }
+}
+
+// MARK: - Export confirmation copy (Slice 7 follow-up)
+
+struct ExportConfirmationMessageTests {
+    @Test func zeroConfirmed_isNil_neverClaimsAWriteThatDidntHappen() {
+        #expect(TriageRootView.exportConfirmationMessage(confirmed: 0) == nil)
+    }
+
+    @Test func singularAndPlural() {
+        #expect(TriageRootView.exportConfirmationMessage(confirmed: 1) == "Saved to Obsidian")
+        #expect(TriageRootView.exportConfirmationMessage(confirmed: 3) == "Saved 3 to Obsidian")
     }
 }
