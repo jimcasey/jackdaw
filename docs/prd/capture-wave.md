@@ -172,6 +172,13 @@ accompanies the media-context ADR.
   ourselves as auto-context. Revisit only if the owner switches podcast apps;
   the intent's media parameters (§5 D) are app-agnostic, so a switch would
   need no code.
+  **Amendment (owner-directed 2026-07-23): dead for *pull*, alive for
+  *push*.** Apple Podcasts *can share* an episode — including timestamped
+  links from the Now Playing screen or a transcript selection — and a
+  Shortcut can be a share-sheet target. Shared-episode capture rides the
+  parameter lane (§4) and slice D. This is the only route by which real
+  Apple Podcasts metadata (canonical episode URL, optionally timestamped)
+  reaches a note.
 - **Location** — unchanged from v1: full precision in-app/foreground; a
   no-launch intent still gets none (ADR 0005 stands).
 
@@ -198,6 +205,19 @@ affordance). That forces — happily — a clean two-lane architecture:
    Apple Music read come back for free** — launcher surfaces get *full*
    ambient context, better than any background cleverness. The medium widget
    (2–4 type buttons) is the flagship typed-capture surface.
+
+**Share-sheet route (parameter-lane variant, owner-directed 2026-07-23):** a
+Shortcut configured as a **share-sheet target** receives a shared URL/text
+(e.g. an Apple Podcasts episode link), prompts for the thought (Ask for
+Input), and invokes `CaptureNoteIntent` with the episode piped into the same
+optional media parameters — no new extension target, no App Group, no new
+capture code. The gesture inverts capture (it starts in the source app,
+~4 taps before typing) but matches the situation: a podcast thought usually
+strikes while looking at the player. A **native Share Extension** (compose
+field inside the share card) is explicitly **deferred**: it's a separate
+process that reopens the App Group / store-sharing question deferred below,
+for UX polish the Shortcut route already covers. Recorded in ADR 3 alongside
+the App Group deferral.
 
 Per-surface verdicts (design-lead, HIG-checked): **build** Action button,
 Shortcuts/Siri, small widget (untyped launcher), medium widget (type buttons),
@@ -236,7 +256,7 @@ lands on-device via the existing PR → TestFlight pipeline.
 | **A** | **External skeleton: text-only `CaptureNoteIntent`** + `AppModelContainer.shared`, invoked from Shortcuts + **Action button**. Untyped, timestamp-only note lands in Triage. | The no-launch capture → SwiftData round-trip and the system-prompt UX — the validation ADR 0005 explicitly deferred. The wave's walking skeleton. |
 | **B** | **NoteType end-to-end:** enum + `typeRaw` (additive migration) + editor type row + capture-sheet type chip + `type:` frontmatter (golden tests) + `NoteTypeAppEnum` on the intent + two typed shortcuts. | The whole type thesis (guardrails 1–5) with zero new context tech; frontmatter contract v2 proven against the real vault. |
 | **C** | **In-app now-playing:** `NowPlayingProviding` + media fields on `Note` + per-type descriptor wiring + media frontmatter + capture-strip/editor display. (Shape depends on S1.) | The second context provider without a plugin system; the media permission UX. |
-| **D** | **Piped context via Shortcuts:** optional media `@Parameter`s + one owner-authored shortcut (**Get Current Song → intent**). The parameters are app-agnostic; the podcast-piping half is dormant (owner uses Apple Podcasts, which pipes nothing — §3) and costs nothing to leave open. | Context-via-parameters composes in practice, proven on the song case. |
+| **D** | **Piped context via Shortcuts:** optional media `@Parameter`s + two owner-authored shortcuts — **Get Current Song → intent** and a **share-sheet target shortcut** (shared Apple Podcasts episode URL + Ask-for-Input thought → intent). Parameters stay app-agnostic. | Context-via-parameters composes in practice — the song case (live read) and the podcast case (share push), covering both halves of the Listening type. |
 | **E** | **Launcher surfaces:** small + medium widget (type buttons, deep link) and Control Center control (`OpenIntent`, dual-target membership) + Lock Screen slots. First extension targets in the project — expect signing/provisioning friction; that's why it's its own slice. | Extension processes, deep-link routing into the sheet, the no-App-Group claim. |
 | **F** | **Last-known-location cache** for external captures, with `fixedAt` provenance + `location_source: cached` frontmatter + visible "approximate" marking in the editor. Floats independently; ships only per §7.4. | The degraded-location story; tunable staleness policy. |
 
@@ -321,7 +341,9 @@ observed behavior per §7.1.
    revisit trigger (owner switches podcast apps) recorded; companion
    feasibility doc carries the research.
 3. **External-surface architecture** — parameter-vs-launcher taxonomy,
-   context-via-parameters principle, intent-in-app-target, the **App Group
+   context-via-parameters principle, intent-in-app-target, the **share-sheet
+   route via Shortcuts** (amending v1's "no share-sheet ingest" non-goal —
+   see §9) with the **native Share Extension deferred**, the **App Group
    deferral** (+ its future migration cost), the location-cache policy (§7.4),
    and the ADR 0004 flip decision (§7.1).
 
@@ -339,6 +361,11 @@ observed behavior per §7.1.
 - **No always-on background context collection** — anything cached exists
   solely to stamp the next capture, marked approximate.
 - **No media picker** — media context is view + clear, never browse/choose.
+- **No native Share Extension** — v1's blanket "no share-sheet ingest"
+  non-goal is **amended, not repealed**: share-sheet capture is in scope
+  *only* as a Shortcut share-target feeding the intent's parameters (§4).
+  A Share Extension target (and the App Group it drags in) stays out until
+  the Shortcut route demonstrably chafes.
 - **No private APIs** (MediaRemote) — even under TestFlight-internal review
   tolerance.
 - **No note-content widgets** — nothing from the inbox renders on the Home
