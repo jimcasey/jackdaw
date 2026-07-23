@@ -5,7 +5,9 @@
 > does **not** follow you to another machine or a cloud session (see "What travels"
 > below). Refresh this file with `/handoff` before switching sessions.
 
-**Last updated:** 2026-07-22 — **🎉 v1 is FEATURE-COMPLETE and validated on-device.**
+**Last updated:** 2026-07-23 — **🎉 v1 is FEATURE-COMPLETE and validated on-device.**
+Since v1: tracking moved to **GitHub Issues**, and PR automation simplified — the agent
+auto-opens PRs then **stops**; the owner drives merges + error reports (PR #26).
 
 ---
 
@@ -77,13 +79,19 @@ not in this file.** In rough priority:
 - Snooze anti-graveyard nudge (#22) and midnight-boundary refinement (#23)
 - Decision: App Store vs. TestFlight-forever (#24)
 
+**Issue labels in use:** `bug`, `enhancement`, `v1.x` (deferred), `needs-decision`,
+`a11y`, `branding`. File new backlog items as Issues with these; keep `docs/` for
+decisions & specs only. Bug-watch #25 tracks a resolved-but-watched export failure mode.
+
 ### Recently landed
-**PRs #1–#15 are all merged to `main`.** The v1 funnel shipped across the feature
-slices — Apple Notes export (#9, follow-up #11) → Obsidian export (#12), with the
-"Saved to Obsidian" confirmation + its render fix (#13–#14). The dev workflow gained
-**auto-open PRs** (#10, #15); the paired **durable 5-minute CI check-back** was later
-**retired (2026-07-23)** — the agent now auto-opens PRs and stops, and the owner drives
-merges + error reports (see `docs/dev-workflow.md`).
+**PRs #1–#16 and #26 are all merged to `main`.** The v1 funnel shipped across the
+feature slices — Apple Notes export (#9, follow-up #11) → Obsidian export (#12), with
+the "Saved to Obsidian" confirmation + its render fix (#13–#14); #16 marked v1
+feature-complete. **#26 (2026-07-23) — v1 process cleanup:** moved the backlog to
+**GitHub Issues** (#17–#25 filed) and simplified PR automation. The dev workflow gained
+**auto-open PRs** (#10, #15); the paired **durable 5-minute CI check-back** was then
+**retired (#26)** — the agent now auto-opens PRs and stops, and the owner drives merges
++ error reports (see `docs/dev-workflow.md`).
 The Obsidian export path and both confirmations are **confirmed working on-device.**
 
 ---
@@ -102,8 +110,9 @@ The Obsidian export path and both confirmations are **confirmed working on-devic
 | Snooze | Calendar-day boundary = session boundary; reappears next local day | `docs/slices/slice-4-triage.md`, `SnoozeSchedule.swift` |
 | Discard | Deferred hard-delete + undo banner (kill-safe toward keep) | `docs/slices/slice-4-triage.md` |
 | Location | Precise GPS, in-app only; priming sheet kept, reduced-accuracy nudge cut, place names lazy-at-display | `docs/slices/slice-5-location.md` |
-| **Dev workflow** | **PRs, not direct pushes to `main`.** Branch → `/open-pr` → `/checkpoint-review` (reuse the tripod + built-in `/code-review`, no separate reviewer agent) → merge. ADRs land as their own PR first; specs/persona-memory ride with the code. | `docs/dev-workflow.md` |
-| **CI / distribution** | **Xcode Cloud — LIVE.** `PR CI` (build + `JackdawTests` on PR-to-`main`) is a **required status check**; `TestFlight` (archive + distribute to Internal Testing on merge-to-`main`, docs-only merges skipped) is validated on-device. Internal testers only. Agent never triggers/reconfigures cloud builds. | ADR 0006, `docs/ci/xcode-cloud-setup.md` |
+| **Dev workflow** | **PRs, not direct pushes to `main`.** Branch → `/open-pr` → `/checkpoint-review` (reuse the tripod + built-in `/code-review`, no separate reviewer agent) → merge. ADRs land as their own PR first; specs/persona-memory ride with the code. **Agent auto-opens PRs then stops — no CI watching; owner drives merges + error reports** (revised 2026-07-23). | `docs/dev-workflow.md` |
+| **Tracking** | Bugs, features, and forward-looking planning → **GitHub Issues** (the backlog, since v1); `docs/` records **decisions & specs** only. Don't reintroduce to-do lists into the docs. | `CLAUDE.md`, GitHub Issues |
+| **CI / distribution** | **Xcode Cloud — LIVE.** `PR CI` (build + `JackdawTests` on PR-to-`main`) is a **required status check** (owner-managed GitHub/App Store Connect infra — the agent no longer watches it); `TestFlight` (archive + distribute to Internal Testing on merge-to-`main`, docs-only merges skipped) is validated on-device. Internal testers only. Agent never triggers/reconfigures cloud builds. | ADR 0006, `docs/ci/xcode-cloud-setup.md` |
 
 Full scope in `docs/prd/mvp-scope.md`. Governing principle: **funnel, not archive** —
 notes flow Capture → Triage → Export and leave; "home is never a growing browsable
@@ -210,6 +219,10 @@ their state — just re-invoke them.
 build-order, slices, dev-workflow, ci runbook, this file), `.claude/agent-memory/`,
 `.claude/agents/`, `.claude/commands/`, all code + tests, the shared `.xcscheme`,
 and `ci_scripts/`.
+
+**Backlog (on GitHub, not in git):** open bugs/features/decisions live in
+[GitHub Issues](https://github.com/jimcasey/jackdaw/issues) — any session with repo
+access sees them. `docs/` holds only decisions & specs, so read Issues for "what's next."
 
 **Does NOT travel (machine-local):**
 - Claude Code's per-project auto-memory. This STATUS.md is the in-repo replacement.
