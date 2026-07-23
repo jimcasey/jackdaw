@@ -5,9 +5,34 @@ metadata:
   type: project
 ---
 
-**Status: design-lead position for v1.x planning (2026-07-23), pending owner
-ratification.** Governs note types, external surfaces, and song/podcast/place
-context.
+**Status: RULED (owner, 2026-07-23) — see `docs/prd/capture-wave.md` for the
+synthesis + rulings.** Governs note types, external surfaces, and
+song/podcast/place context. Ruling outcomes vs. my position:
+
+- **§7.1 flip in slice A — my position WON** (compose as primary bottom chrome,
+  deep-links present sheet regardless of flag, revert-without-debate hatch).
+  Empty state 1a (`ContentUnavailableView`, "Inbox clear") becomes the default
+  launch view — already specced in navigation-and-screen-inventory.md.
+- **§7.2 medium widget in first tranche — my case LOST**; queued as first
+  candidate when slice B lands. First tranche = S1+A+B only.
+- **§7.4 — my hard line HONORED**: cached location for *untyped* external
+  captures only, visibly marked approximate; a stale cache never silently
+  stamps a Place note. Place-typed capture routes through launcher surfaces.
+- **Surface principle EVOLVED (I accept it for Listening):** my "typed =
+  foreground" is superseded by context-via-parameters — typed *no-launch*
+  shortcuts are fine when the caller pipes the context (Get Current Song →
+  Listening). Place remains foreground-only in principle (no pipeable
+  location source). Watch: tranche 1 typed shortcuts carry NO auto-context
+  (piping is slice D, foreground surfaces slice E) — types are label-only
+  until then.
+- **Share-sheet route (owner-directed):** Shortcut as share-sheet target →
+  Ask for Input → intent media parameters. Meets my bar (system UI, accessible
+  for free) with guardrails: shared URL goes to media params only, never
+  prepended to note body; type hardcoded Listening in the shortcut; empty
+  Ask-for-Input result must not create an empty note (prune convention).
+  Native Share Extension explicitly deferred (§9).
+- Owner uses **Apple Podcasts, not Spotify** → podcast auto-context dead for
+  pull; Apple Music is the only live media source.
 
 ## Type model — "surface implies type; untyped default; triage files"
 - **Capture never requires a type choice.** Untyped is a first-class, permanent
