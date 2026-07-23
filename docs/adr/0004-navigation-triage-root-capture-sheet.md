@@ -3,6 +3,11 @@
 > **Status:** Accepted — app root is **Triage**; **Capture** is a modal sheet
 > auto-presented on launch. **Supersedes** the two-tab `Capture | Triage` shell
 > previously ratified in `docs/design/navigation-and-screen-inventory.md` §2.
+> **Amended 2026-07-23 by ADR 0008:** the endgame anticipated here ships in
+> capture-wave slice A — auto-present turns **off** (bare Triage root, compose
+> button as primary chrome), with a revert-without-debate escape hatch. See
+> `docs/adr/0008-external-surface-architecture.md` and
+> `docs/prd/capture-wave.md` §7.1.
 > **Date:** 2026-07-14
 > **Owner of decision:** design-lead + product-lead, feasibility-checked by
 > tech-lead, arbitrated by owner.

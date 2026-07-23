@@ -4,6 +4,12 @@
 > in-app capture); **ship and validate NO external capture surface in v1**. All
 > external surfaces (Action button, Shortcuts, Control Center, Siri, widget, Lock
 > Screen) and the `CaptureNoteIntent` front-end are **fast-follow (v1.x)**.
+> **Amended 2026-07-23 by ADR 0008:** the deferred surfaces are now scheduled
+> (capture-wave plan, slices A/D/E). The load-bearing constraint here —
+> no-launch = no live location — **stands**, extended by an untyped-only
+> last-known-location cache; the foregrounding (`openAppWhenRun = true`)
+> variant is **rejected**. See `docs/adr/0008-external-surface-architecture.md`
+> and `docs/prd/capture-wave.md` §7.4.
 > **Date:** 2026-07-14
 > **Owner of decision:** tech-lead (feasibility + architecture), arbitrated by owner.
 
