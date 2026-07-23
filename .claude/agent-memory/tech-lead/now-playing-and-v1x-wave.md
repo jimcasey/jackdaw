@@ -1,14 +1,45 @@
 ---
 name: now-playing-and-v1x-wave
-description: v1.x/v2 "context + external surfaces" wave — now-playing feasibility verdict (the wave's GPS-gate analog), surface taxonomy (parameter vs launcher surfaces), NoteType model recommendation, App Group deferral, proposed slice order. Status = tech-lead PROPOSAL 2026-07-23, NOT owner-ratified.
+description: v1.x/v2 "context + external surfaces" wave — now-playing feasibility verdict (the wave's GPS-gate analog), surface taxonomy (parameter vs launcher surfaces), NoteType model recommendation, App Group deferral, slice order. Status = owner RULED 2026-07-23 (see "Owner rulings"); plan doc = docs/prd/capture-wave.md (PR #28).
 metadata:
   type: project
 ---
 
 # v1.x wave: note types + context + external surfaces (proposed 2026-07-23)
 
-**Status: tech-lead position paper delivered to owner; nothing ratified. Three ADRs
-proposed (note-type model / now-playing context / external-surface architecture).**
+**Status: owner ruled on all decision points 2026-07-23; synthesis doc is
+`docs/prd/capture-wave.md` (PR #28). Three ADRs to write (note-type model /
+now-playing context / external-surface architecture).**
+
+## Owner rulings (2026-07-23) — do not relitigate
+
+- Two hardcoded types (Place, Listening) + extensibility ladder with four
+  forward-compat commitments (string-tolerant `typeRaw`, verbatim `type:` emit
+  *when present*, single `NoteTypeSpec` seam, AppEnum→AppEntity migration cost).
+- Owner uses **Apple Podcasts, not Spotify** → Apple Music is the only live
+  auto-context source; Spotify Web API route rejected; podcast metadata arrives
+  only via the **share route** (Shortcut as share-sheet target → episode URL into
+  the intent's media `@Parameter`s). Native Share Extension deferred with App Group.
+- §7.3: `type:` **OMITTED for untyped notes** — my emit-always lean was
+  **overruled**. Omission is serializer policy; enum keeps an untyped case.
+  Adding `type: quick` later is serializer-additive but semantically breaking for
+  vault queries keyed on key-absence — record that nuance in ADR 1.
+- ADR 0004 auto-present flip lands in slice A. First tranche = S1 + A + B.
+  Location cache: untyped external captures only, marked approximate
+  (`location_source: cached`), no foregrounding intent.
+
+## Verified during PR #28 review (2026-07-23)
+
+- **Apple Podcasts timestamped share links are REAL (iOS 18+):** Now Playing
+  share sheet's "From Start" block lets you pick the paused timestamp; transcript
+  long-press gives "Share from [time]". Min target iOS 26 → no gate.
+- **Shortcut as share-sheet target is REAL:** "Show in Share Sheet" + accepted
+  input types (URL); shared item arrives as Shortcut Input; the shortcut can then
+  Ask for Input and run our App Intent (same no-launch engine as any shortcut run).
+  Apple Support: shortcuts guide apd163eb9f95 / apd7644168e1.
+- **Unverified until slice D:** what Apple Podcasts actually puts in the shared
+  payload — likely a bare URL, title NOT guaranteed. Share-route notes may carry
+  `mediaURL` only. Use a View-Content-Graph probe shortcut to inspect.
 
 ## FEASIBILITY VERDICT — now-playing context (the wave's load-bearing gate)
 
