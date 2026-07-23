@@ -1,6 +1,9 @@
 # Jackdaw v1.x "capture wave" — proposed scope & build order
 
-> **Status: PROPOSED — awaiting owner ratification. Nothing here is settled.**
+> **Status: PROPOSED — awaiting owner ratification** (partially ratified: the
+> §2 type set — hardcoded Place + Listening — was ratified by the owner
+> 2026-07-23, with the direction to keep future extensibility options
+> considered; see §2's "Extensibility path").
 > Synthesized 2026-07-23 from three tripod position papers (full positions in
 > `.claude/agent-memory/{product,design,tech}-lead/`). Where the personas
 > disagree, the disagreement is preserved in §7 as an explicit owner decision
@@ -60,7 +63,7 @@ If a future proposal breaks guardrail 1 or 3, it's filing, and it's out.
 
 ## 2. Scope
 
-### Types: two hardcoded types plus untyped. No type management UI.
+### Types: two hardcoded types plus untyped. No type management UI. *(RATIFIED by owner 2026-07-23, with the extensibility direction below.)*
 
 - **`Place`** — context affinity: precise location + place name (the
   "visited this restaurant" case, generalized).
@@ -82,6 +85,48 @@ If a future proposal breaks guardrail 1 or 3, it's filing, and it's out.
   location"). A restaurant note without a fix is not worthless — the text
   carries the restaurant. Missing context = omitted frontmatter keys, never
   empty values.
+
+### Extensibility path (owner directive 2026-07-23: considered now, built later)
+
+Hardcoded types are the ratified scope for **this wave**; the owner wants the
+road beyond kept deliberately open. The ladder, cheapest first — a future
+release climbs one rung only when the previous rung demonstrably chafes:
+
+1. **Types stay code; the enum grows.** A new type = one enum case + a
+   descriptor + (optionally) a typed shortcut/widget button — a small PR. For
+   a single user who owns the repo, this is a real extensibility mechanism,
+   not a cop-out. Chafes when: the owner wants a new type *away from a dev
+   machine*, or edits become frequent.
+2. **Data-driven type definitions, no UI.** Types declared in a bundled or
+   user-editable config (plist/JSON — conceivably even a file read from the
+   vault, so the notes system defines its own intake). A type definition
+   names: raw value, display name, SF Symbol, and which of the *existing*
+   context affinities it wants (location / now-playing). No new context
+   kinds — definitions can only recombine providers that exist in code.
+   Chafes when: definitions want per-type behavior that isn't expressible as
+   data.
+3. **User-defined types in-app** (`@Model` entity + management UI). The full
+   product feature — and a taxonomy-tending settings surface, which is why it
+   sits last and needs its own funnel-principle argument when its day comes.
+
+**Forward-compat commitments this wave makes now** (so rungs 2–3 stay
+additive migrations, not rewrites — these go into ADR 1):
+
+- `typeRaw` is a **plain stored `String`**, not constrained to the enum — an
+  unknown raw value must degrade to untyped at display (the
+  `NoteStatus`-style `?? .quick` fallback), never crash or block export. Rung
+  2/3 values then persist with zero schema change.
+- The **frontmatter `type:` key emits the raw string verbatim** — the vault
+  contract is "a short stable string", not "one of these two words", so new
+  types are automatically export-compatible.
+- **All per-type behavior routes through the single `NoteTypeSpec`
+  descriptor** — the one seam a data-driven registry (rung 2) would replace.
+  No type-switching scattered in views or the serializer.
+- **The known migration cost, named:** the intent's type parameter. A static
+  `AppEnum` (this wave) is baked into Shortcuts at build time; dynamic types
+  (rung 2+) require migrating that parameter to an `AppEntity` +
+  `EntityQuery`. Contained to the intent layer, but it is the one place rung
+  2 costs real work — recorded here so it's priced in, not rediscovered.
 
 ### Context providers: exactly two, no plugin system
 
@@ -256,9 +301,12 @@ observed behavior per §7.1.
 ## 8. ADRs to write before building (each its own PR, ratify-then-build)
 
 1. **NoteType model** — types-as-context-bundles ruling + guardrails; fixed
-   code-defined raw-string enum; no user-defined types; per-type context
+   code-defined raw-string enum (ratified 2026-07-23); per-type context
    descriptors in code; frontmatter contract v2 (`type:` policy per §7.3,
-   media keys, omit-when-absent, golden tests).
+   media keys, omit-when-absent, golden tests); **the §2 extensibility
+   ladder and its four forward-compat commitments** (string-tolerant
+   `typeRaw`, verbatim `type:` emit, single-descriptor seam, the
+   AppEnum→AppEntity migration cost).
 2. **Media / now-playing context** — the §3 verdict matrix (written after S1
    answers the background question), chosen sources, Apple Podcasts and
    system-wide declared dead, MediaRemote rejected, Spotify per §7.5;
