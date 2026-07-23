@@ -62,7 +62,9 @@ and on filing decisions at capture time.
    Triage is the app's decision surface; "what kind of note was that" is a
    triage-shaped decision.
 
-If a future proposal breaks guardrail 1 or 3, it's filing, and it's out.
+If a future proposal breaks a guardrail, it's filing, and it's out. (Watch
+guardrail 2 especially — untyped-stays-fastest is the one gold-plating erodes
+gesture by gesture.)
 
 ## 2. Scope
 
@@ -93,7 +95,9 @@ If a future proposal breaks guardrail 1 or 3, it's filing, and it's out.
 
 Hardcoded types are the ratified scope for **this wave**; the owner wants the
 road beyond kept deliberately open. The ladder, cheapest first — a future
-release climbs one rung only when the previous rung demonstrably chafes:
+release climbs one rung only when the previous rung demonstrably chafes
+**and the climb has a named user-value case** (which captures does the
+current rung fail?); developer convenience alone doesn't justify a rung:
 
 1. **Types stay code; the enum grows.** A new type = one enum case + a
    descriptor + (optionally) a typed shortcut/widget button — a small PR. For
@@ -106,8 +110,10 @@ release climbs one rung only when the previous rung demonstrably chafes:
    names: raw value, display name, SF Symbol, and which of the *existing*
    context affinities it wants (location / now-playing). No new context
    kinds — definitions can only recombine providers that exist in code.
-   Chafes when: definitions want per-type behavior that isn't expressible as
-   data.
+   Like rung 3, climbing here needs its own funnel-principle argument —
+   cheap type creation is exactly how two generic types become nine specific
+   ones. Chafes when: definitions want per-type behavior that isn't
+   expressible as data.
 3. **User-defined types in-app** (`@Model` entity + management UI). The full
    product feature — and a taxonomy-tending settings surface, which is why it
    sits last and needs its own funnel-principle argument when its day comes.
@@ -119,9 +125,11 @@ additive migrations, not rewrites — these go into ADR 1):
   unknown raw value must degrade to untyped at display (the
   `NoteStatus`-style `?? .quick` fallback), never crash or block export. Rung
   2/3 values then persist with zero schema change.
-- The **frontmatter `type:` key emits the raw string verbatim** — the vault
-  contract is "a short stable string", not "one of these two words", so new
-  types are automatically export-compatible.
+- The **frontmatter `type:` key emits the raw string verbatim *when
+  present*** — untyped notes omit the key entirely per the §7.3 ruling; the
+  commitment is that any emitted value is the raw string, never a remapped
+  one. The vault contract is "a short stable string", not "one of these two
+  words", so new types are automatically export-compatible.
 - **All per-type behavior routes through the single `NoteTypeSpec`
   descriptor** — the one seam a data-driven registry (rung 2) would replace.
   No type-switching scattered in views or the serializer.
@@ -212,7 +220,12 @@ Shortcut configured as a **share-sheet target** receives a shared URL/text
 (e.g. an Apple Podcasts episode link), prompts for the thought (Ask for
 Input), and invokes `CaptureNoteIntent` with the episode piped into the same
 optional media parameters — no new extension target, no App Group, no new
-capture code. The gesture inverts capture (it starts in the source app,
+capture code. Three guardrails ride into ADR 3: the shared URL lands in the
+**media parameters only, never prepended into the note body** (the body is
+the thought; the episode is context); the share shortcut **hardcodes
+type = Listening** (guardrail 1 applies to Shortcuts-authored flows too); and
+a cancelled or empty Ask-for-Input **creates no note** (the prune-on-abandon
+convention). The gesture inverts capture (it starts in the source app,
 ~4 taps before typing) but matches the situation: a podcast thought usually
 strikes while looking at the player. A **native Share Extension** (compose
 field inside the share card) is explicitly **deferred**: it's a separate
@@ -236,9 +249,11 @@ target; the intent's `NoteTypeAppEnum` mirrors the persistence enum so
 `NoteType` stays free of AppIntents imports.
 
 **Capture-sheet & context display (design-lead):** a thin non-interactive
-context strip in the sheet header (type chip + place/media chips appearing as
-context resolves — reserved height, no cursor displacement, no announcements,
-cross-fade gated on Reduce Motion, folding into #19's scope). Triage rows keep
+context strip in the sheet header: the type chip (**display-only in the
+sheet** — correction happens at triage, per guardrail 5) plus place/media
+chips appearing as context resolves. Reserved height sized relative to
+Dynamic Type, no cursor displacement, no announcements, cross-fade gated on
+Reduce Motion, folding into #19's scope. Triage rows keep
 the single secondary context line with strict truncation priority (time →
 place → media; time never drops). Editor Context section gains: type menu
 row, "Use current location" backfill, media row (view + Clear only — **no
@@ -253,11 +268,11 @@ lands on-device via the existing PR → TestFlight pipeline.
 
 | # | Slice | Proves / retires |
 |---|-------|------------------|
-| **S1** | **Spike (timeboxed, owner on device): now-playing read.** Media-library permission + foreground `nowPlayingItem` read; then the same read inside a no-launch intent. | The wave's feasibility gate: is Apple Music context foreground-only or also background? Output feeds the media-context ADR. Pure risk retirement. |
-| **A** | **External skeleton: text-only `CaptureNoteIntent`** + `AppModelContainer.shared`, invoked from Shortcuts + **Action button**. Untyped, timestamp-only note lands in Triage. **Includes the ADR 0004 flip (§7.1):** auto-present off, bare Triage root, compose button as primary chrome. | The no-launch capture → SwiftData round-trip and the system-prompt UX — the validation ADR 0005 explicitly deferred. The wave's walking skeleton, and the nav endgame validated on-device. |
-| **B** | **NoteType end-to-end:** enum + `typeRaw` (additive migration) + editor type row + capture-sheet type chip + `type:` frontmatter (golden tests) + `NoteTypeAppEnum` on the intent + two typed shortcuts. | The whole type thesis (guardrails 1–5) with zero new context tech; frontmatter contract v2 proven against the real vault. |
-| **C** | **In-app now-playing:** `NowPlayingProviding` + media fields on `Note` + per-type descriptor wiring + media frontmatter + capture-strip/editor display. (Shape depends on S1.) | The second context provider without a plugin system; the media permission UX. |
-| **D** | **Piped context via Shortcuts:** optional media `@Parameter`s + two owner-authored shortcuts — **Get Current Song → intent** and a **share-sheet target shortcut** (shared Apple Podcasts episode URL + Ask-for-Input thought → intent). Parameters stay app-agnostic. | Context-via-parameters composes in practice — the song case (live read) and the podcast case (share push), covering both halves of the Listening type. |
+| **S1** | **Spike (timeboxed, owner on device): now-playing read.** Media-library permission + foreground `nowPlayingItem` read; then the same read inside a no-launch intent. | Feasibility input to ADR 2: is Apple Music context foreground-only or also background? A NO on background is the *expected* result and threatens nothing — context-via-parameters (slice D) is the load-bearing external route. Pure risk retirement. |
+| **A** | **External skeleton: text-only `CaptureNoteIntent`** + `AppModelContainer.shared`, invoked from Shortcuts + **Action button**. Untyped, timestamp-only note lands in Triage. **Includes the ADR 0004 flip (§7.1):** auto-present off, bare Triage root, compose button as primary chrome, root empty state per screen-inventory 1a (now the default launch view). | The no-launch capture → SwiftData round-trip and the system-prompt UX — the validation ADR 0005 explicitly deferred. The wave's walking skeleton, and the nav endgame validated on-device. |
+| **B** | **NoteType end-to-end:** enum + `typeRaw` (additive migration) + editor type row incl. the **"Use current location" backfill** + capture-sheet type chip (display-only) + `type:` frontmatter (golden tests, asserting key *absence* for untyped) + `NoteTypeAppEnum` on the intent + **one typed shortcut: Listening**. The Place trigger deliberately waits for its correct surface (slice E, foreground — §7.4 routing): no place-label-without-a-place notes ship; a triage-assigned Place note is repaired via the backfill. **Honesty note:** tranche 1 ships types as frontmatter labels *without* their context bundles (context arrives in C/D/E) — criterion 6.3 is not evaluable against this tranche. | The whole type thesis (guardrails 1–5) with zero new context tech; frontmatter contract v2 proven against the real vault. |
+| **C** | **In-app now-playing:** `NowPlayingProviding` + media fields on `Note` + per-type descriptor wiring + media frontmatter + capture-strip/editor display. (Shape depends on S1.) | The second context provider without a plugin system; the media-permission UX — **never front-loaded**: lazy, in-context priming on the first Listening-relevant capture, mirroring the location pattern. |
+| **D** | **Piped context via Shortcuts:** optional media `@Parameter`s + two owner-authored shortcuts — **Get Current Song → intent** and a **share-sheet target shortcut** (shared Apple Podcasts episode URL + Ask-for-Input thought → intent). Parameters stay app-agnostic. **Payload floor is a bare URL** — episode title/show reaching `mediaTitle` is optional polish, verified per app, never assumed. | Context-via-parameters composes in practice — the song case (live read) and the podcast case (share push), covering both halves of the Listening type. |
 | **E** | **Launcher surfaces:** small + medium widget (type buttons, deep link) and Control Center control (`OpenIntent`, dual-target membership) + Lock Screen slots. First extension targets in the project — expect signing/provisioning friction; that's why it's its own slice. | Extension processes, deep-link routing into the sheet, the no-App-Group claim. |
 | **F** | **Last-known-location cache** for external captures, with `fixedAt` provenance + `location_source: cached` frontmatter + visible "approximate" marking in the editor. Floats independently; ships only per §7.4. | The degraded-location story; tunable staleness policy. |
 
@@ -269,7 +284,9 @@ tranche: **S1 + A + B.**
 ## 6. Success criteria (owner-behavior style, per PRD §6)
 
 1. **Capture moves outside the app** — over a real usage window, external
-   surfaces become the majority origin of captures.
+   surfaces become the majority origin of captures. (With the §7.1 flip
+   shipping in slice A, this criterion's role is the flip's **keep/revert
+   metric**, not its gate.)
 2. **Typed capture costs zero extra gestures** — choosing a typed trigger is
    no slower than the plain one; no capture is abandoned over a type decision.
 3. **The promised context actually arrives** — observable as the owner
@@ -290,9 +307,12 @@ tranche: **S1 + A + B.**
    with the Action button; the root's compose affordance becomes primary
    chrome (bottom-docked, 44pt+, labeled); deep-linked captures present the
    sheet regardless of the flag. Escape hatch stands: *revert without
-   debate* if a week of real use shows in-app capture still dominant.
-2. **First-tranche surface breadth.** **RULED: commit A–B now; decide the
-   medium widget's timing (slice E) when B lands** — by then the owner knows
+   debate* if in-app capture is still dominant after **~2 weeks of real use,
+   clocked from when the Action button is actually configured** — not from
+   ship; week one is habit lag, not evidence. (Recalibrated per the
+   2026-07-23 checkpoint review.)
+2. **First-tranche surface breadth.** **RULED: commit S1 + A + B now; decide
+   the medium widget's timing (slice E) when B lands** — by then the owner knows
    whether typed capture pulls. (Product-lead's one-at-a-time discipline,
    with design-lead's widget case explicitly queued as the first candidate,
    not dropped.)
@@ -302,8 +322,10 @@ tranche: **S1 + A + B.**
    (Overrides tech-lead's emit-always lean — noted so it isn't relitigated.
    The internal enum still carries an untyped case; omission is serializer
    policy, not a model change.) This is now frozen contract: adding
-   `type: quick` later would be an additive change; *renaming* any emitted
-   value would be breaking.
+   `type: quick` later would be **serializer-additive only** — vault queries
+   identifying untyped notes by key-absence (`WHERE !type`) would break, a
+   vault-side behavioral change to price in; *renaming* any emitted value
+   would be breaking outright. Golden tests assert key absence for untyped.
 4. **External location for no-launch captures.** **RULED: cache for untyped
    external captures only, visibly marked approximate** (editor marking +
    `location_source: cached` frontmatter + `fixedAt` provenance). Place-typed
@@ -340,8 +362,13 @@ tranche: **S1 + A + B.**
    route via Shortcuts** (amending v1's "no share-sheet ingest" non-goal —
    see §9) with the **native Share Extension deferred**, the **App Group
    deferral** (+ its future migration cost), the location-cache policy as
-   ruled in §7.4 (untyped-only, marked approximate), and the ADR 0004 flip as
-   ruled in §7.1 (flip in slice A, revert-without-debate escape hatch).
+   ruled in §7.4 (untyped-only, marked approximate), the three share-shortcut
+   guardrails (§4: URL→parameters never body; hardcoded Listening; no note
+   on empty input), and the ADR 0004 flip as ruled in §7.1 (flip in slice A,
+   recalibrated escape hatch). **The same PR adds amended-by pointers to
+   ADR 0004 and ADR 0005** — this ADR changes both accepted decisions
+   (auto-present behavior; no-launch = no location), and their status lines
+   must point forward or future sessions relitigate settled ground.
 
 ## 9. Wave non-goals (naming the pressure now, refusing it now)
 
@@ -359,9 +386,13 @@ tranche: **S1 + A + B.**
 - **No media picker** — media context is view + clear, never browse/choose.
 - **No native Share Extension** — v1's blanket "no share-sheet ingest"
   non-goal is **amended, not repealed**: share-sheet capture is in scope
-  *only* as a Shortcut share-target feeding the intent's parameters (§4).
-  A Share Extension target (and the App Group it drags in) stays out until
-  the Shortcut route demonstrably chafes.
+  *only* as a Shortcut share-target feeding **media context into the
+  existing media parameters** (§4). The amendment is scoped to the Listening
+  *job*, not to "share as intake" — any proposal to add non-media intent
+  parameters to serve shared content (articles, links, places) is a *new*
+  reopening of the non-goal and needs its own funnel argument. A Share
+  Extension target (and the App Group it drags in) stays out until the
+  Shortcut route demonstrably chafes.
 - **No private APIs** (MediaRemote) — even under TestFlight-internal review
   tolerance.
 - **No note-content widgets** — nothing from the inbox renders on the Home
@@ -371,9 +402,11 @@ tranche: **S1 + A + B.**
 
 ## 10. Process from here
 
-1. Owner ratifies/amends: the §1 ruling + guardrails, the §2 scope, the §5
-   order, and rules on the §7 decision points (§7.5's two inputs gate the
-   media ADR).
-2. The three §8 ADRs land as their own PRs (S1 spike feeds ADR 2).
+1. All §7 decision points are ruled; **merging this PR ratifies the
+   remainder** — the §1 ruling + guardrails and the §5 order, as amended by
+   the 2026-07-23 checkpoint review (tripod panel, fix-then-ship; findings
+   applied in-doc).
+2. The three §8 ADRs land as their own PRs (S1 feeds ADR 2; ADR 3's PR also
+   stamps the amended-by pointers on ADRs 0004/0005).
 3. Issue #21 is updated to point at this plan; per-slice issues (S1, A–F) are
    filed with the existing labels; this doc stays the durable "why".
