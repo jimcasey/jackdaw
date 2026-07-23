@@ -5,94 +5,84 @@
 > does **not** follow you to another machine or a cloud session (see "What travels"
 > below). Refresh this file with `/handoff` before switching sessions.
 
-**Last updated:** 2026-07-23 — **🎉 v1 is FEATURE-COMPLETE and validated on-device.**
-Since v1: tracking moved to **GitHub Issues**, and PR automation simplified — the agent
-auto-opens PRs then **stops**; the owner drives merges + error reports (PR #26).
+**Last updated:** 2026-07-23 — **v1 is COMPLETE; the v1.x "capture wave" is
+PLANNED & RATIFIED.** The wave's plan (`docs/prd/capture-wave.md`) merged via
+PR #28 after a full tripod checkpoint review; ADRs 0007 + 0008 are drafted (in
+the current ADR PR); per-slice work is filed as issues #29–#35.
 
 ---
 
 ## Where we are
 
 Jackdaw is an iOS quick-capture inbox: **Capture → Triage → Export to Obsidian**.
-Built in thin end-to-end slices per the de-risking rule.
+**v1 is feature-complete and validated on the owner's iPhone** — the full funnel
+works end to end on-device (write byte-verified into the vault, note deleted,
+both bottom confirmations shown), on a live **Xcode Cloud CI/CD** pipeline
+(`PR CI` on PRs, TestFlight on merge). Slices 0–7 all merged.
 
-**v1 is feature-complete and validated on the owner's iPhone.** The full funnel
-works end to end on-device: a kept note is written into the Obsidian vault,
-**byte-verified**, deleted from Jackdaw, and syncs to Obsidian. Both bottom
-confirmations were confirmed on-device — **"Saved to Obsidian"** on keep and the
-**"Note discarded — Undo"** banner on discard. All feature slices (0–7) are merged
-to `main` through the PR + tripod-review flow, on a live **Xcode Cloud CI/CD**
-pipeline (`PR CI` on PRs, automated TestFlight on merge). What remains is optional
-**v1.x** polish (below), not v1 work.
+### The v1.x capture wave (current work)
 
-### Slice progress
+Three owner asks: **note types** ("visited this restaurant" / "thought about
+this podcast"), **external capture surfaces** (Action button, Shortcuts,
+widget, Control Center), **richer context** (song/podcast/location) tied to
+types. The full plan — governing ruling, guardrails, feasibility verdicts,
+surface model, slice order, all owner rulings — is
+**`docs/prd/capture-wave.md`** (ratified 2026-07-23, PR #28). Load-bearing
+facts a fresh session must know:
 
-| # | Slice | Status |
-|---|-------|--------|
-| 0 | Walking skeleton on TestFlight | ✅ done, on device |
-| 1 | Vault bookmark write+verify (Talon `ExportDestination` seed) | ✅ done, **T2 proven on-device** |
-| 2 | In-app capture + SwiftData | ✅ done (then reworked in Slice 3) |
-| 3 | Capture rework → Triage-root + auto-presented Capture **sheet** | ✅ done |
-| 4 | Real Triage inbox (Keep/Snooze/Discard, undo, editor) | ✅ done |
-| 5 | Location context (in-app precise GPS, async backfill) | ✅ done |
-| 6 | **Apple Notes export** (intermediate milestone) | ✅ merged (#9 + follow-up #11) |
-| 7 | **Obsidian export → v1 complete** | ✅ **done, validated on-device** (#12; toast fix #13–#14) |
+- **Types are capture-context bundles, never taxonomy** (5 guardrails, ADR
+  0007). Two hardcoded types — `place`, `listening` — plus untyped default.
+  No type management UI; extensibility ladder recorded for later.
+- **The wave's feasibility verdict:** Apple Music now-playing is readable
+  **in-app foreground only**; Apple Podcasts and system-wide playback are
+  **dead to third-party apps**. Owner uses Apple Podcasts + no Spotify →
+  podcast metadata arrives **only via the share route** (Shortcut as
+  share-sheet target piping the episode URL into intent parameters).
+  **External context = caller-supplied parameters, never background reads.**
+- **Two surface lanes** (ADR 0008): parameter surfaces (Action button /
+  Shortcuts / Siri — no-launch speed lane, untyped stays fastest) vs.
+  launcher surfaces (widget / Control Center — deep-link into the foreground
+  Capture sheet; Place-typed capture lives here). No App Group this wave
+  (recorded deferral).
+- **ADR 0004 flip ships in slice A:** auto-present off → bare Triage root;
+  ~2-week revert-without-debate hatch clocked from Action-button-configured.
+- `type:` frontmatter is **omitted for untyped** notes; golden tests assert
+  key absence. Location cache (slice F) stamps **untyped** external captures
+  only, marked approximate.
 
-**Numbering caveat:** implementation slice numbers run **one ahead** of the
-at-a-glance table in `docs/build-order.md` (the capture rework became its own
-slice). Trust the table there for the canonical order; the `docs/slices/slice-N-*.md`
-files are the detailed specs.
+### Capture-wave slice progress
 
-### What's built vs. not
-- **Built:** capture (autosave-as-you-type, sheet), Triage inbox with the three
-  actions + deferred-delete undo + calendar-day snooze + light editing, location
-  attachment.
-- **Slice 6 — Apple Notes export — MERGED (#9), PR CI green.** The export half above
-  the seam is live: `NoteSerializer` (markdown + YAML frontmatter; reused by Obsidian),
-  `RetentionMachine` (pure `kept → pending → writing → confirmed → deleted`; delete
-  only on confirm) + `ExportCoordinator`, `AppleNotesDestination` (share-sheet;
-  **degraded** confirm), the `ExportDestination` seam evolved to **batch / async /
-  per-note outcome**, `Note` gained `pending/writing/confirmed` + `exportFailureRaw`,
-  and Triage gained the outbox count + "Export N to Notes". Off-device suite in
-  `JackdawTests/ExportTests.swift`. **A tech-lead-review follow-up PR adds:** launch
-  `writing → pending` reconciliation (`ExportReconciler`), off-device tests for
-  `ObsidianFolderDestination.writeBatch` (Slice 7's real path), and do/`catch` on the
-  kill-safety save.
-- **Slice 7 — Obsidian export — MERGED (#12), validated on-device.** Triage points at
-  `ObsidianFolderDestination` (reuses `VaultAccess`/`FolderWriter`/`VaultBookmarkStore`
-  from Slice 1); **Hybrid** trigger (auto-export on Keep once a vault exists) +
-  **counts-only** surfacing via `OutboxSummary`; lazy vault setup + stale-bookmark
-  re-grant via one `.fileImporter`; `returnToInbox` escape; `ExportReconciler` runs at
-  launch **and** on foreground. A **"Saved to Obsidian"** confirmation (overlay toast +
-  VoiceOver announcement, #13–#14) is the at-a-glance "it reached the vault" signal.
-  `VaultProofView` deleted; `AppleNotesDestination` retained (unused) as the seam's
-  documented second adapter.
+| # | Slice | Issue | Status |
+|---|-------|-------|--------|
+| S1 | Now-playing spike (foreground + no-launch read) — feeds media ADR | #29 | committed; **needs owner on device** |
+| A | External skeleton: `CaptureNoteIntent` + Action button + ADR 0004 flip | #30 | committed; gated on ADR 0008 merge |
+| B | NoteType end-to-end (Listening shortcut only; location backfill) | #31 | committed; gated on ADR 0007 merge |
+| C | In-app now-playing (Apple Music) | #32 | ratified order, not committed; needs S1 + media ADR |
+| D | Piped context via Shortcuts (Get Current Song + podcast share route) | #33 | ratified order, not committed |
+| E | Launcher surfaces (widgets + Control Center) | #34 | **decide when B lands** (`needs-decision`) |
+| F | Last-known-location cache (untyped external only) | #35 | floats; ships per §7.4 policy |
 
-### Immediate next step — v1 is done
-No remaining v1 work. **Forward-looking work — v1.x features, open decisions, and the
-export bug-watch — is now tracked in [GitHub Issues](https://github.com/jimcasey/jackdaw/issues),
-not in this file.** In rough priority:
-- Branding: real app icon (#17) + marketable name (#18)
-- Reduce-Motion gating for the toast / undo-banner transitions (#19)
-- Per-note stuck list — only if the counts-only outbox proves too blunt (#20)
-- External capture surfaces via `CaptureNoteIntent` over the `CaptureService` seam — deferred per ADR 0005 (#21)
-- Snooze anti-graveyard nudge (#22) and midnight-boundary refinement (#23)
-- Decision: App Store vs. TestFlight-forever (#24)
+**v1 slice history (all ✅ done, on device):** 0 walking skeleton · 1 vault
+bookmark write+verify · 2 capture + SwiftData · 3 capture rework (Triage-root
++ sheet) · 4 real Triage · 5 location · 6 Apple Notes export (milestone) ·
+7 Obsidian export. Details: `docs/build-order.md` (numbering caveat noted
+there), `docs/slices/slice-N-*.md`.
 
-**Issue labels in use:** `bug`, `enhancement`, `v1.x` (deferred), `needs-decision`,
-`a11y`, `branding`. File new backlog items as Issues with these; keep `docs/` for
-decisions & specs only. Bug-watch #25 tracks a resolved-but-watched export failure mode.
+### Immediate next step
 
-### Recently landed
-**PRs #1–#16 and #26 are all merged to `main`.** The v1 funnel shipped across the
-feature slices — Apple Notes export (#9, follow-up #11) → Obsidian export (#12), with
-the "Saved to Obsidian" confirmation + its render fix (#13–#14); #16 marked v1
-feature-complete. **#26 (2026-07-23) — v1 process cleanup:** moved the backlog to
-**GitHub Issues** (#17–#25 filed) and simplified PR automation. The dev workflow gained
-**auto-open PRs** (#10, #15); the paired **durable 5-minute CI check-back** was then
-**retired (#26)** — the agent now auto-opens PRs and stops, and the owner drives merges
-+ error reports (see `docs/dev-workflow.md`).
-The Obsidian export path and both confirmations are **confirmed working on-device.**
+1. **Merge the open ADR PR** (ADR 0007 + ADR 0008 + amended-by stamps on
+   ADRs 0004/0005 + this STATUS refresh).
+2. **Run the S1 spike (#29)** — needs the owner, a device, and Xcode; its
+   answer feeds the third ADR (media context), which should be written before
+   slice C.
+3. **Build slice A (#30)**, then **B (#31)** — the committed tranche.
+
+**Open issues:** #17 icon, #18 name, #19 reduce-motion (now also covers the
+wave's new transitions), #20 per-note outbox list, #22 snooze nudge,
+#23 snooze midnight, #24 App Store decision, #25 export bug-watch,
+**#29–#35 capture wave**. #21 closed as superseded by the plan.
+Labels in use: `bug`, `enhancement`, `v1.x`, `needs-decision`, `a11y`,
+`branding`.
 
 ---
 
@@ -100,139 +90,118 @@ The Obsidian export path and both confirmations are **confirmed working on-devic
 
 | Decision | Value | Source |
 |----------|-------|--------|
-| Obsidian write mechanism | **T2** — folder-write into local vault; Obsidian Sync propagates. Proven on-device. Git = fallback. | ADR 0001 |
+| Obsidian write mechanism | **T2** folder-write into local vault; proven on-device | ADR 0001 |
 | Min iOS target | **iOS 26** | ADR 0002 |
-| Persistence | **SwiftData** (additive lightweight migration; no migration plan pre-release) | ADR 0003 |
-| Navigation | **Triage-root + auto-presented Capture sheet** (reversed the earlier two-tab shell) | ADR 0004 |
-| External capture | **Deferred to v1.x.** Clean `CaptureService` seam built; no external surface in v1. A no-launch App Intent **cannot get precise GPS** (platform rule). | ADR 0005, `docs/feasibility/external-capture-precise-gps.md` |
-| Capture model | **Autosave-as-you-type** (lazy create, prune-on-abandon; overrode explicit-save) | `docs/slices/slice-2-*.md`, design capture flow |
-| Retention | **Hold-until-sync-confirmed** (delete only after verified write) | PRD, ADR 0001 |
-| Snooze | Calendar-day boundary = session boundary; reappears next local day | `docs/slices/slice-4-triage.md`, `SnoozeSchedule.swift` |
-| Discard | Deferred hard-delete + undo banner (kill-safe toward keep) | `docs/slices/slice-4-triage.md` |
-| Location | Precise GPS, in-app only; priming sheet kept, reduced-accuracy nudge cut, place names lazy-at-display | `docs/slices/slice-5-location.md` |
-| **Dev workflow** | **PRs, not direct pushes to `main`.** Branch → `/open-pr` → `/checkpoint-review` (reuse the tripod + built-in `/code-review`, no separate reviewer agent) → merge. ADRs land as their own PR first; specs/persona-memory ride with the code. **Agent auto-opens PRs then stops — no CI watching; owner drives merges + error reports** (revised 2026-07-23). | `docs/dev-workflow.md` |
-| **Tracking** | Bugs, features, and forward-looking planning → **GitHub Issues** (the backlog, since v1); `docs/` records **decisions & specs** only. Don't reintroduce to-do lists into the docs. | `CLAUDE.md`, GitHub Issues |
-| **CI / distribution** | **Xcode Cloud — LIVE.** `PR CI` (build + `JackdawTests` on PR-to-`main`) is a **required status check** (owner-managed GitHub/App Store Connect infra — the agent no longer watches it); `TestFlight` (archive + distribute to Internal Testing on merge-to-`main`, docs-only merges skipped) is validated on-device. Internal testers only. Agent never triggers/reconfigures cloud builds. | ADR 0006, `docs/ci/xcode-cloud-setup.md` |
+| Persistence | **SwiftData** (additive lightweight migration) | ADR 0003 |
+| Navigation | Triage-root + auto-presented Capture sheet; **auto-present turns OFF in capture-wave slice A** | ADR 0004 (amended by ADR 0008) |
+| External capture | `CaptureService` seam (v1); **surfaces now scheduled**; no-launch = no live location stands | ADR 0005 (amended by ADR 0008), `docs/feasibility/external-capture-precise-gps.md` |
+| CI / distribution | **Xcode Cloud LIVE** — `PR CI` required check; TestFlight on merge; agent never triggers cloud builds | ADR 0006, `docs/ci/xcode-cloud-setup.md` |
+| **Note types** | Capture-context bundles + 5 guardrails; `place`/`listening` hardcoded + untyped; frontmatter contract v2 (`type:` omitted for untyped); extensibility ladder | **ADR 0007**, `docs/prd/capture-wave.md` §1–2 |
+| **External-surface architecture** | Parameter vs launcher lanes; context-via-parameters; share route (3 guardrails, Listening-job-scoped); App Group deferred; location cache untyped-only; no foregrounding intent | **ADR 0008**, plan §4/§7 |
+| **Media context** | Apple Music = sole live source (foreground); Apple Podcasts/system-wide dead; Spotify + MediaRemote rejected | plan §3/§7.5 → **third ADR pending S1** |
+| Capture model | Autosave-as-you-type (lazy create, prune-on-abandon) | `docs/slices/slice-2-*.md` |
+| Retention | Hold-until-sync-confirmed | PRD, ADR 0001 |
+| Snooze / Discard | Calendar-day boundary / deferred hard-delete + undo | `docs/slices/slice-4-triage.md` |
+| Location | Precise GPS, in-app; lazy place names | `docs/slices/slice-5-location.md` |
+| Dev workflow | PRs only; branch → `/open-pr` → `/checkpoint-review` → merge; **agent auto-opens PRs then stops** — owner drives merges + error reports | `docs/dev-workflow.md` |
+| Tracking | Backlog → **GitHub Issues**; `docs/` = decisions & specs only | `CLAUDE.md` |
 
-Full scope in `docs/prd/mvp-scope.md`. Governing principle: **funnel, not archive** —
-notes flow Capture → Triage → Export and leave; "home is never a growing browsable
-library." No browsing/search/history of exported notes.
-
-**Open/deferred (tracked in GitHub Issues — do not treat as settled):**
-- **Marketable name** is still TBD (store display name is a placeholder **"JackdawNotes"**;
-  the codename `Jackdaw` and bundle ID `com.jimcodes.Jackdaw` are unaffected) — **#18**.
-  Rationale in `.claude/agent-memory/product-lead/project_marketable-name.md`.
-- **App icon** is a placeholder (`Jackdaw/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`) — **#17**.
-- **Discard-undo banner** was shipped (Slice 4); the older "open call" in
-  `docs/build-order.md` is settled.
+Governing principle: **funnel, not archive** — no browsing/search/history.
+Wave-specific non-goals (no type-based views, no type management UI, no
+media picker, no note-content widgets, share amendment scoped to media-only):
+`docs/prd/capture-wave.md` §9.
 
 ### Field notes — on-device issues (watch for recurrence)
-- **Obsidian export "not landing" on the first on-device pass (2026-07-21 → largely
-  RESOLVED 2026-07-22).** Kept notes didn't write to the vault (nor appear in the Files
-  app) and no export bar showed; the notes stayed safe in Jackdaw (hold-until-confirmed),
-  and it healed via a destination-folder rename + **Retry**. Now **guarded**: a verified
-  write shows the "Saved to Obsidian" toast (*no toast = nothing landed*, #14) and the
-  interrupted-write reconciler runs on foreground as well as at launch. The exact
-  first-pass trigger was never reproduced — the full fingerprint, hypotheses, and the
-  "if it recurs" diagnostic checklist are in the tracking issue: **#25**.
+- **Obsidian export "not landing" on first pass (2026-07-21, largely
+  resolved):** guarded now by the "Saved to Obsidian" toast (*no toast =
+  nothing landed*) and the foreground reconciler. Fingerprint + diagnostic
+  checklist: **#25**.
 
 ---
 
 ## How to build & verify (learned the hard way)
 
-### Local (the inner loop — unchanged)
-- **Full Xcode is at `/Applications/Xcode.app`** (26.x). The default `xcode-select`
-  points at CommandLineTools, so CLI builds need:
-  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`
+### Local (the inner loop)
+- **Full Xcode at `/Applications/Xcode.app`** (26.x); CLI builds need
+  `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 - **Run the tests:**
   ```
   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test \
     -scheme Jackdaw -destination 'platform=iOS Simulator,name=iPhone 17' \
     -only-testing:JackdawTests -derivedDataPath /tmp/jackdaw-derived
   ```
-  (Use a real `-derivedDataPath` — a literal `<placeholder>` trips zsh's redirect
-  parsing. `Jackdaw` is now a **shared** scheme whose Test action is scoped to
-  `JackdawTests` only.)
-- **Test count:** **76 `@Test` cases** as of 2026-07-22 (green on `PR CI`) —
-  ExportTests 43, TriageTests 9, CaptureViewModelTests 8, LocationTests 6,
-  Slice1VaultTests 6, CaptureServiceTests 3, JackdawTests 1.
-- **Build only:** `xcodebuild build -scheme Jackdaw -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath <scratch>`
-- **STALE-BUILD GOTCHA:** multiple DerivedData dirs exist (Xcode's + CLI). Always
-  build with an explicit `-derivedDataPath` and install THAT `.app`.
-- **Sim launch/screenshot:** `xcrun simctl install/launch/io "iPhone 17" …`;
-  bundle id **`com.jimcodes.Jackdaw`**. Grant location:
-  `xcrun simctl privacy "iPhone 17" grant location com.jimcodes.Jackdaw`; set a
-  coordinate: `xcrun simctl location "iPhone 17" set <lat>,<lon>`.
-- **Can't be automated headlessly (owner must check on sim/device):** typing a note,
-  swipe gestures, permission prompts, real precise GPS, TestFlight/signing.
+  (Real `-derivedDataPath` required; `Jackdaw` is a shared scheme, Test
+  action scoped to `JackdawTests`.)
+- **Test count: 76 `@Test` cases** (green on `PR CI`, 2026-07-22; unchanged —
+  everything since has been docs-only). ExportTests 43, TriageTests 9,
+  CaptureViewModelTests 8, LocationTests 6, Slice1VaultTests 6,
+  CaptureServiceTests 3, JackdawTests 1.
+- **STALE-BUILD GOTCHA:** multiple DerivedData dirs; always build with an
+  explicit `-derivedDataPath` and install THAT `.app`.
+- **Sim:** `xcrun simctl install/launch/io "iPhone 17" …`; bundle id
+  `com.jimcodes.Jackdaw`; grant location via `simctl privacy`, set coords via
+  `simctl location`.
+- **Can't be automated headlessly:** typing, swipes, permission prompts, real
+  GPS, TestFlight/signing — and the **S1 spike** (media-library permission +
+  a real now-playing read) is in this category.
 
-### CI/CD (Xcode Cloud — LIVE; owner-configured in App Store Connect)
-- **`PR CI`** — on Pull Request → `main`: builds `Jackdaw` + runs `JackdawTests`
-  (~3 min). It is a **required status check**, so no PR merges red. Runs on all PRs
-  (docs included — deliberately; skipping conflicts with the required-check).
-- **`TestFlight`** — on merge → `main`: archives (Release) + distributes to
-  **TestFlight Internal Testing** (owner's device). ~15–20 min. Skips docs-only
-  merges (`docs/`, `.claude/`, `CLAUDE.md` excluded).
-- **Repo pieces that make CI/CD work:** shared `Jackdaw.xcscheme` (Test = `JackdawTests`
-  only), `ci_scripts/ci_post_clone.sh` (unique build number), app-target
-  `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO`, and the app icon. No other
-  `ci_scripts` — the project has no external deps.
-- **Guardrails:** cloud compute is a finite owner-managed quota (25 h/mo free; real
-  use ≈ a few hours). **The agent never triggers or reconfigures Xcode Cloud
-  workflows** — builds are a consequence of git events the owner configured. Full
-  setup runbook + gotchas: `docs/ci/xcode-cloud-setup.md`.
-- **Version note:** `MARKETING_VERSION` is **1.0.1** (bumped past Slice 0's manual
-  `1.0 (2)`); `ci_post_clone.sh` stamps the build number.
+### CI/CD (Xcode Cloud — LIVE, owner-configured)
+- **`PR CI`** on PR→`main`: build + `JackdawTests` (~3 min), **required
+  status check**. Runs on all PRs including docs.
+- **`TestFlight`** on merge→`main`: archive + distribute to Internal Testing
+  (~15–20 min); skips docs-only merges (`docs/`, `.claude/`, `CLAUDE.md`).
+- Repo pieces: shared `Jackdaw.xcscheme`, `ci_scripts/ci_post_clone.sh`
+  (build number), `INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO`.
+- **Guardrails:** cloud compute is owner-managed quota; **the agent never
+  triggers or reconfigures Xcode Cloud.** Runbook:
+  `docs/ci/xcode-cloud-setup.md`. `MARKETING_VERSION` = 1.0.1.
 
 ---
 
 ## Development workflow (how changes land)
 
-- **PRs, not direct pushes to `main`.** `main` is branch-protected and stays green.
-- **Flow:** branch → commit → `/open-pr` → `/checkpoint-review` → merge.
-- **Agent PR automation (revised 2026-07-23):** the agent **auto-opens** the PR after
-  a coherent push, then **stops** — it no longer watches or gates on `PR CI`. The
-  **owner** notifies of merges and reports CI/build errors back for the agent to fix.
-  (The earlier ~5-min CI check-back is retired.) See `docs/dev-workflow.md`.
-- **Commands:** `/open-pr` (scaffold a PR from the branch), `/checkpoint-review`
-  (route the diff to the relevant tripod personas + built-in `/code-review`),
-  `/handoff`, `/adr`, `/prd`.
-- **Recording decisions:** a real architectural decision gets its **own ADR PR
-  first**; persona-memory + slice specs ride **in the same PR** as the code.
-- Full process: `docs/dev-workflow.md`.
+- **PRs, not direct pushes to `main`** (branch-protected). Flow: branch →
+  commit → `/open-pr` → `/checkpoint-review` → merge.
+- **Agent PR automation:** the agent **auto-opens** the PR after a coherent
+  push, then **stops** — no CI watching. The **owner** notifies of merges and
+  reports CI/build errors back. See `docs/dev-workflow.md`.
+- **ADR-first:** a real architectural decision gets its ADR ratified before
+  its code (0007/0008 precede slices B/A accordingly; the media ADR precedes
+  slice C and waits on S1).
+- Commands: `/open-pr`, `/checkpoint-review`, `/handoff`, `/adr`, `/prd`.
 
 ---
 
 ## The tripod (personas) & memory
 
-Three subagents in `.claude/agents/` — `product-lead`, `design-lead`, `tech-lead` —
-own why/what, experience, and how respectively. Invoke by name ("have the tech-lead
-spec Slice 6"). They also staff PR reviews, each on its dimension. Their memory lives
-in `.claude/agent-memory/` and **is committed**, so a fresh session's personas reload
-their state — just re-invoke them.
+Three subagents in `.claude/agents/` — `product-lead`, `design-lead`,
+`tech-lead` — own why/what, experience, how. Their committed memory in
+`.claude/agent-memory/` now includes the **capture-wave position papers and
+checkpoint-review takeaways** (the wave's full research trail — e.g. the
+now-playing verdict with citations lives in
+`tech-lead/now-playing-and-v1x-wave.md`). Re-invoke them in a fresh session;
+they reload from memory. They also staff PR reviews (see the PR #28
+checkpoint review for the pattern).
 
 ---
 
 ## What travels to a new/remote session — and what doesn't
 
-**Travels (in git):** `CLAUDE.md`, everything in `docs/` (PRD, ADRs, design,
-build-order, slices, dev-workflow, ci runbook, this file), `.claude/agent-memory/`,
-`.claude/agents/`, `.claude/commands/`, all code + tests, the shared `.xcscheme`,
-and `ci_scripts/`.
+**Travels (in git):** `CLAUDE.md`, everything in `docs/` (PRD incl.
+`capture-wave.md`, ADRs 0001–0008, design, build-order, slices, dev-workflow,
+CI runbook, this file), `.claude/agent-memory/`, `.claude/agents/`,
+`.claude/commands/`, all code + tests, the shared `.xcscheme`, `ci_scripts/`.
 
-**Backlog (on GitHub, not in git):** open bugs/features/decisions live in
-[GitHub Issues](https://github.com/jimcasey/jackdaw/issues) — any session with repo
-access sees them. `docs/` holds only decisions & specs, so read Issues for "what's next."
+**Backlog (on GitHub):** issues #17–#35 (see "Open issues" above) — any
+session with repo access sees them.
 
-**Does NOT travel (machine-local):**
-- Claude Code's per-project auto-memory. This STATUS.md is the in-repo replacement.
-- The conversation transcript. A remote session starts fresh — this file orients it.
-- Local build scratch (DerivedData) — disposable.
-- **Xcode Cloud workflow config** lives in **App Store Connect**, not the repo — it's
-  owner-managed and already set up (both workflows). See the runbook.
+**Does NOT travel:** Claude Code's machine-local auto-memory (this file is
+the in-repo replacement); the conversation transcript; local DerivedData;
+Xcode Cloud workflow config (lives in App Store Connect, owner-managed).
 
-**Before switching sessions:** run `/handoff` to refresh this file, then **commit and
-push your branch and open/update its PR** — a remote/cloud session only sees pushed
-commits, and changes land via PR, not direct pushes to `main` (see
-`docs/dev-workflow.md`). The build environment on the far side needs **Xcode 26.x +
-the iOS 26 SDK** to build/verify.
+**Before switching sessions:** run `/handoff`, then **commit and push your
+branch and open/update its PR** — a remote session only sees pushed commits;
+changes land via PR, not direct pushes to `main`. The far side needs
+**Xcode 26.x + the iOS 26 SDK** to build/verify (a sandbox without Xcode can
+still edit code and drive the docs workflow — this handoff was written from
+one).
