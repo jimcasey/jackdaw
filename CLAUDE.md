@@ -91,11 +91,11 @@ Changes land via **pull request**, not direct pushes to `main`. Full process in
   buildable and green; don't push to it directly.
 - **Agent PR automation (owner-directed, standing):** after pushing a coherent
   change to its branch, the agent **opens the PR automatically** — it does **not**
-  wait for owner confirmation. It then watches `PR CI` on a **~5-minute** cadence (a
-  run takes ~5 min) and acts on the result: **green →** stop watching, hand back to
-  the owner for the next action (don't re-arm); **yellow** (still building) **→**
-  re-arm a ~5-min check; **red →** diagnose and push a fix. Full rules in
-  `docs/dev-workflow.md` §"Agent PR automation."
+  wait for owner confirmation — and then **stops**. The agent does **not** watch,
+  poll, or gate on `PR CI`. The **owner** notifies the agent when a PR is merged and
+  reports any CI/build errors back for the agent to fix. (Revised 2026-07-23 — the
+  earlier ~5-min CI check-back is retired.) Full rules in `docs/dev-workflow.md`
+  §"Agent PR automation."
 - **Reviews reuse the tripod**, each on its dimension — tech-lead (architecture,
   Swift, tests), design-lead (HIG, a11y, when UI changes), product-lead (scope,
   funnel principle) — plus the built-in `/code-review` for line-level mechanics.

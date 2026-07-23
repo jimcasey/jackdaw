@@ -80,9 +80,10 @@ not in this file.** In rough priority:
 ### Recently landed
 **PRs #1–#15 are all merged to `main`.** The v1 funnel shipped across the feature
 slices — Apple Notes export (#9, follow-up #11) → Obsidian export (#12), with the
-"Saved to Obsidian" confirmation + its render fix (#13–#14). The dev workflow itself
-was hardened: **auto-open PRs** and a **durable 5-minute CI check-back** (#10, #15;
-session-only crons were silently dying on the remote runner — see `docs/dev-workflow.md`).
+"Saved to Obsidian" confirmation + its render fix (#13–#14). The dev workflow gained
+**auto-open PRs** (#10, #15); the paired **durable 5-minute CI check-back** was later
+**retired (2026-07-23)** — the agent now auto-opens PRs and stops, and the owner drives
+merges + error reports (see `docs/dev-workflow.md`).
 The Obsidian export path and both confirmations are **confirmed working on-device.**
 
 ---
@@ -179,7 +180,11 @@ library." No browsing/search/history of exported notes.
 ## Development workflow (how changes land)
 
 - **PRs, not direct pushes to `main`.** `main` is branch-protected and stays green.
-- **Flow:** branch → commit → `/open-pr` → `PR CI` + `/checkpoint-review` → merge.
+- **Flow:** branch → commit → `/open-pr` → `/checkpoint-review` → merge.
+- **Agent PR automation (revised 2026-07-23):** the agent **auto-opens** the PR after
+  a coherent push, then **stops** — it no longer watches or gates on `PR CI`. The
+  **owner** notifies of merges and reports CI/build errors back for the agent to fix.
+  (The earlier ~5-min CI check-back is retired.) See `docs/dev-workflow.md`.
 - **Commands:** `/open-pr` (scaffold a PR from the branch), `/checkpoint-review`
   (route the diff to the relevant tripod personas + built-in `/code-review`),
   `/handoff`, `/adr`, `/prd`.
