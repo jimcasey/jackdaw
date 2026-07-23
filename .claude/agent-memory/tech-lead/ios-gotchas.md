@@ -44,6 +44,25 @@ behavior may have changed.
   `bookmarkDataIsStale` on resolve (re-create bookmark). Use `NSFileCoordinator` for the
   actual write since iCloud/Obsidian may touch the folder concurrently.
 
+- **Now-playing facts (verified 2026-07-23):** `MPNowPlayingInfoCenter` is
+  publish-only — a third-party app CANNOT read other apps' now-playing info (Control
+  Center's view is a system privilege; DTS points askers at SiriKit media-intent
+  *donation*, not any read API — forum thread 809554). `systemMusicPlayer` reflects the
+  **Music app only** (not Podcasts/Spotify — thread 100187); reading the library
+  requires `NSAppleMusicUsageDescription` (mandatory per Apple bundle-resources doc) +
+  media-library/MusicKit authorization. `MPMusicPlayerController` does not work in app
+  extensions and background reads are reported flaky. MediaRemote = private framework.
+  Shortcuts has "Get Current Song" (Music only); Apple Podcasts exposes NO
+  current-episode action; Overcast exposes "Get Current Episode Info" via Shortcuts.
+
+- **Widget/control extension facts (verified 2026-07-23):** widget + Control Center
+  control extensions are separate processes; sharing SwiftData with them requires an
+  App Group container (skippable if the extension never touches the store, i.e. pure
+  launcher). Widgets/controls CANNOT prompt for text input (`requestValueDialog` is a
+  Shortcuts/Siri affordance); a control that must open the app needs its intent
+  compiled into both targets and `openAppWhenRun=true`/`OpenIntent` (UIApplication is
+  unavailable in extensions — Apple forums 758911/762479, WWDC23 10103).
+
 - **iCloud write semantics:** writing to an iCloud-backed folder lands in the LOCAL
   iCloud mirror; upload is async/eventual. A successful local write != confirmed cloud
   upload. Fine for single-device; use `URLUbiquitousItemDownloadingStatus`/
