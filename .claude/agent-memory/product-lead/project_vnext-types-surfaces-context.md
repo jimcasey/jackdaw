@@ -1,13 +1,51 @@
 ---
 name: project_vnext-types-surfaces-context
-description: v1.x/v2 wave position — note types, external surfaces, context providers; guardrails keeping types from becoming filing; PROPOSED, pending owner ratification
+description: v1.x/v2 wave position — note types, external surfaces, context providers; guardrails keeping types from becoming filing; RULED 2026-07-23, see rulings section
 metadata:
   type: project
 ---
 
-**Status: PROPOSED (2026-07-23), not yet owner-ratified.** My position paper for
-the post-v1 wave (owner brief: note types, more capture surfaces, more context,
-"continued focus on quick capture"). Consult before relitigating.
+**Status: RULED (2026-07-23).** Owner ruled on all decision points; synthesis +
+rulings live in `docs/prd/capture-wave.md` (PR #28). My original position paper
+below, then the rulings. Consult before relitigating.
+
+## Owner rulings (2026-07-23) — settled, do not reopen
+
+- **§7.1 ADR 0004 flip: I was OVERRULED.** Flip auto-present at slice A (design's
+  ship-gate), not behavior-gated on criterion 1 as I argued. Escape hatch:
+  revert without debate if a week of real use shows in-app capture still
+  dominant. Accepted; my review flagged the one-week window as too
+  hair-triggered (habit lag guarantees in-app dominance in week 1) — asked for
+  a calibrated window, not a re-argument of the gate.
+- **§7.2 tranche: my position won.** Commit S1+A+B only; medium widget (slice E)
+  decided when B lands, design's widget case queued first, not dropped.
+- **§7.3:** omit `type:` for untyped (overrode tech-lead's emit-always).
+  Frozen contract: adding `type: quick` later = additive; renaming = breaking.
+- **§7.4:** location cache for untyped external captures only, visibly marked
+  approximate. Place-typed goes through launcher surfaces (real fix) only.
+- **§7.5:** owner uses Apple Podcasts, not Spotify → podcast auto-context is
+  **dead for pull, alive for push**: share-sheet Shortcut route (slice D) is
+  the only path for real Apple Podcasts metadata. Apple Music = only live
+  auto-context source.
+- **§9 amendment:** v1's "no share-sheet ingest" non-goal amended (not
+  repealed) — Shortcut-share-target-into-intent-parameters only; native Share
+  Extension stays out until the Shortcut route chafes.
+
+## Funnel fences I hold on the amendments (my review lines, PR #28)
+
+- **Share route is justified by the Listening JTBD only** ("podcast thought
+  strikes at the player"), not by generic share-ingest. Tripwire = any ask to
+  add **non-media parameters** for shared content (generic `url:`/`source:`
+  field, articles, photos, links-as-links). That's read-later/link-saving — a
+  different product — and needs its own funnel argument, not a ride on this
+  amendment. The shared URL is *context frontmatter on a text thought*; the
+  thought (Ask for Input) stays the note.
+- **Extensibility ladder rung 2** (data-driven type defs) must carry the same
+  funnel-argument clause rung 3 has — a vault-readable type config is a
+  taxonomy-tending surface in embryo. Chafe triggers are currently
+  dev-convenience-worded; climbing also needs a user-value case.
+- Success criterion 1 (external majority) survives the 7.1 overrule as the
+  **revert/keep metric** for the flip, no longer its precondition.
 
 ## The core ruling I argued: types are context bundles, not filing
 
