@@ -3,7 +3,9 @@
 > **Status: PROPOSED — awaiting owner ratification** (partially ratified: the
 > §2 type set — hardcoded Place + Listening — was ratified by the owner
 > 2026-07-23, with the direction to keep future extensibility options
-> considered; see §2's "Extensibility path").
+> considered, see §2's "Extensibility path"; and the §7.5 media-source
+> inputs are answered — Apple Podcasts user, not a Spotify user — making
+> Apple Music the only live media auto-context source).
 > Synthesized 2026-07-23 from three tripod position papers (full positions in
 > `.claude/agent-memory/{product,design,tech}-lead/`). Where the personas
 > disagree, the disagreement is preserved in §7 as an explicit owner decision
@@ -162,10 +164,14 @@ accompanies the media-context ADR.
 
 - **"Current song"** — feasible: automatic in-app (Apple Music, foreground) and
   externally by piping Shortcuts' *Get Current Song* into the capture intent.
-- **"Current podcast"** — degraded: feasible *only* as piped Shortcuts context
-  from an app that exposes it (Overcast confirmed; Apple Podcasts dead). If
-  the owner uses Apple Podcasts, the podcast wish is auto-context-dead — the
-  Listening *type* still works, but the episode gets dictated by hand.
+- **"Current podcast"** — **auto-context-dead for this owner (ruled
+  2026-07-23).** Piped Shortcuts context requires an app that exposes it
+  (Overcast confirmed); **the owner uses Apple Podcasts**, which exposes
+  nothing. The Listening *type* still covers podcast thoughts — labeled
+  frontmatter, episode dictated/typed by hand — but we do not market it to
+  ourselves as auto-context. Revisit only if the owner switches podcast apps;
+  the intent's media parameters (§5 D) are app-agnostic, so a switch would
+  need no code.
 - **Location** — unchanged from v1: full precision in-app/foreground; a
   no-launch intent still gets none (ADR 0005 stands).
 
@@ -230,7 +236,7 @@ lands on-device via the existing PR → TestFlight pipeline.
 | **A** | **External skeleton: text-only `CaptureNoteIntent`** + `AppModelContainer.shared`, invoked from Shortcuts + **Action button**. Untyped, timestamp-only note lands in Triage. | The no-launch capture → SwiftData round-trip and the system-prompt UX — the validation ADR 0005 explicitly deferred. The wave's walking skeleton. |
 | **B** | **NoteType end-to-end:** enum + `typeRaw` (additive migration) + editor type row + capture-sheet type chip + `type:` frontmatter (golden tests) + `NoteTypeAppEnum` on the intent + two typed shortcuts. | The whole type thesis (guardrails 1–5) with zero new context tech; frontmatter contract v2 proven against the real vault. |
 | **C** | **In-app now-playing:** `NowPlayingProviding` + media fields on `Note` + per-type descriptor wiring + media frontmatter + capture-strip/editor display. (Shape depends on S1.) | The second context provider without a plugin system; the media permission UX. |
-| **D** | **Piped context via Shortcuts:** optional media `@Parameter`s + owner-authored shortcuts (Get Current Song → intent; Overcast episode → intent). | Context-via-parameters composes in practice; the podcast wish in its only feasible form. |
+| **D** | **Piped context via Shortcuts:** optional media `@Parameter`s + one owner-authored shortcut (**Get Current Song → intent**). The parameters are app-agnostic; the podcast-piping half is dormant (owner uses Apple Podcasts, which pipes nothing — §3) and costs nothing to leave open. | Context-via-parameters composes in practice, proven on the song case. |
 | **E** | **Launcher surfaces:** small + medium widget (type buttons, deep link) and Control Center control (`OpenIntent`, dual-target membership) + Lock Screen slots. First extension targets in the project — expect signing/provisioning friction; that's why it's its own slice. | Extension processes, deep-link routing into the sheet, the no-App-Group claim. |
 | **F** | **Last-known-location cache** for external captures, with `fixedAt` provenance + `location_source: cached` frontmatter + visible "approximate" marking in the editor. Floats independently; ships only per §7.4. | The degraded-location story; tunable staleness policy. |
 
@@ -290,13 +296,14 @@ observed behavior per §7.1.
    value external capture exists for. **Synthesis recommendation:** slice F
    ships cache for *untyped* external captures only, visibly marked
    approximate; Place-typed capture is a launcher-surface (foreground) story.
-5. **Two owner inputs that gate scope:** *Which podcast app do you actually
-   use?* (Overcast → slice D delivers the podcast wish; Apple Podcasts → the
-   auto-context half is dead and we say so in the ADR.) *Are you a Spotify
-   user?* (If yes, the Spotify Web API route — OAuth + first network
-   dependency in a fully-local app — becomes a real but expensive option;
-   recommendation is to reject it unless the answer is an emphatic yes.
-   MediaRemote private API is rejected outright regardless.)
+5. **Two owner inputs that gated scope — ANSWERED (2026-07-23):** the owner
+   uses **Apple Podcasts** (→ podcast auto-context is dead; see §3's ruling —
+   Listening remains a manual-context type for podcasts) and is **not a
+   Spotify user** (→ the Spotify Web API route is rejected; the app stays
+   fully local with no network dependency. MediaRemote private API was
+   already rejected regardless). Net: the only *live* media auto-context
+   source is **Apple Music** — in-app foreground reads (slice C) and
+   Get Current Song piping (slice D).
 
 ## 8. ADRs to write before building (each its own PR, ratify-then-build)
 
@@ -308,9 +315,11 @@ observed behavior per §7.1.
    `typeRaw`, verbatim `type:` emit, single-descriptor seam, the
    AppEnum→AppEntity migration cost).
 2. **Media / now-playing context** — the §3 verdict matrix (written after S1
-   answers the background question), chosen sources, Apple Podcasts and
-   system-wide declared dead, MediaRemote rejected, Spotify per §7.5;
-   companion feasibility doc carries the research.
+   answers the background question); Apple Music as the sole live
+   auto-context source; Apple Podcasts and system-wide declared dead;
+   MediaRemote and the Spotify Web API rejected (owner rulings, §7.5); the
+   revisit trigger (owner switches podcast apps) recorded; companion
+   feasibility doc carries the research.
 3. **External-surface architecture** — parameter-vs-launcher taxonomy,
    context-via-parameters principle, intent-in-app-target, the **App Group
    deferral** (+ its future migration cost), the location-cache policy (§7.4),
