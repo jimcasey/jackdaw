@@ -28,13 +28,15 @@ Screen / Back Tap, 5) home-screen quick action / Shortcuts widget, 6) in-app Cap
 sheet (reliable baseline; for *typed* capture plausibly not slower than the prompt).
 Excluded: Share Sheet (PRD non-goal), text-entry widgets (impossible).
 
-**THE OPEN GATE (design position):** an App Intent running outside the foreground app
-may not get a precise GPS fix → external captures could be **timestamp-only**, which
-guts the "context attached automatically" promise. **Do NOT commit to external-
-primary until tech-lead confirms location is obtainable AND on-device friction is
-validated.** Tech-lead feasibility items: (1) no-launch text-capture intent; (2)
-location from extension/background; (3) whether a Control Center control can surface
-the text prompt itself.
+**THE GATE — RESOLVED (ADR 0005 / docs/feasibility/external-capture-precise-gps.md):**
+a no-launch App Intent **cannot** get a GPS fix (platform rule; When-In-Use +
+backgrounded = no updates without a foreground-asserted session). External no-launch
+captures are **timestamp-only by design**. v1 shipped in-app only; external surfaces
+are v1.x over the built `CaptureService` seam. Remaining tech-lead verify item:
+whether a Control Center control can surface the text prompt itself (HIG says
+controls "cannot capture complex input" → assume no; fallback = control opens the
+Capture sheet, which is *better* for typed/contextful captures anyway — see
+[[types-and-context]]).
 
 Full doc: `docs/design/capture-and-triage-flows.md` §0. Related: [[nav-model]],
 [[capture-model]], [[funnel-nav-constraint]].
