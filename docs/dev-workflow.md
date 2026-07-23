@@ -64,7 +64,7 @@ branch  →  commit work  →  /open-pr  →  /checkpoint-review  →  address f
 
 ---
 
-## Agent PR automation (owner-directed 2026-07-21)
+## Agent PR automation (owner-directed 2026-07-21, revised 2026-07-23)
 
 Standing rules for how the agent drives the PR half of the loop, so the owner
 isn't the bottleneck on ceremony. These **override** the agent's default "don't
@@ -75,40 +75,34 @@ open a PR unless asked" posture for this repo.
    `main` itself (description from the diff + linked slice/ADR, honoring any PR
    template — i.e. `/open-pr`). Opening early / as draft is fine.
 
-2. **Watch `PR CI` on a ~5-minute cadence, then act on the color.** After opening
-   (or after any push to the branch), the agent re-checks the PR's status about
-   every **~5 minutes** — a `PR CI` run takes ~5 min, so a longer interval just adds
-   dead time — and follows this decision flow:
+2. **Then stop — the agent does not watch `PR CI`.** After opening the PR the agent
+   hands back. It does **not** poll, watch, subscribe to, or gate on `PR CI`, and it
+   does **not** schedule check-back Routines for CI status. The **owner** owns the
+   rest of the loop:
+   - the owner **notifies the agent when a PR is merged** (the agent's cue to pick up
+     the next piece of work), and
+   - the owner **reports any CI / build errors back to the agent**, which then
+     diagnoses and pushes a fix on request.
 
-   | CI color | Meaning | Agent action |
-   |----------|---------|--------------|
-   | 🟢 **Green** | Required checks passed | **Stop** — do **not** re-arm the check. Hand back to the owner for the next action (`/checkpoint-review`, merge). |
-   | 🟡 **Yellow** | Still building / pending (no terminal result yet) | **Re-arm** a ~5-min check and keep waiting. |
-   | 🔴 **Red** | A required check failed | **Attempt to fix** — diagnose from the logs, push a fix to the branch (which restarts the cycle at step 2). If the failure is out of scope or resists a fix, report the diagnosis and where it's stuck. |
-
-   "Green → wait for input" is deliberate: CI passing is a *correctness* gate, not
-   a merge decision. Merge and the checkpoint review stay the **owner's call** (the
-   owner arbitrates) — the agent stops babysitting and hands back, rather than
-   re-polling a PR that has nothing left to watch.
-
-   > **How the re-check is scheduled — use a DURABLE Routine, not a session cron
-   > (learned the hard way 2026-07-22).** GitHub webhooks (`subscribe_pr_activity`)
-   > deliver CI **failures** and comments but **not CI success / new pushes / merge**,
-   > so the green/yellow re-check needs a *scheduled* wake-up. Schedule it with a
-   > **durable Routine** — the claude-code-remote `send_later` / `create_trigger`
-   > (self-bound to the session) — which is **server-persisted and survives the remote
-   > container being reclaimed** between messages. Do **NOT** use session-only
-   > `CronCreate`: on the web/remote runner the session idles and is reclaimed between
-   > turns (gaps of hours or days), which **silently wipes in-memory cron jobs before
-   > they ever fire** — the re-check just never happens and the owner has to poll
-   > green by hand. If the Routine's MCP server is momentarily disconnected, say so and
-   > retry when it reconnects — never fall back to a cron that won't persist.
+   This **replaces** the earlier "watch `PR CI` on a ~5-minute durable-Routine
+   cadence, act on the color" rule (**retired 2026-07-23**). On the web/remote runner
+   that polling proved brittle — runs that queued or never started left the agent
+   looping on a status that never resolved — and the owner is a faster, more reliable
+   signal for both merge and failure than the agent watching a required check it
+   can't influence anyway.
 
 3. **This does not change the cloud-spend guardrails below.** The agent still never
    *triggers* or reconfigures Xcode Cloud; CI runs are a consequence of the
    owner-configured PR/merge triggers. Auto-opening a PR is the one git event the
-   agent now performs without asking — it costs the one `PR CI` run that a PR was
-   always going to cost.
+   agent performs without asking — it costs the one `PR CI` run that a PR was always
+   going to cost.
+
+> **Note on the `PR CI` required status check (infrastructure, owner-managed).**
+> Whether `PR CI` remains a *required* status check on `main` lives in **GitHub
+> branch protection + App Store Connect (Xcode Cloud)**, not in this repo — the agent
+> can't change it. Removing the agent's watching of CI (above) does **not** remove
+> that gate; if the owner wants `main` to accept merges with no check at all, that's a
+> branch-protection / Xcode Cloud settings change the owner makes directly.
 
 ---
 

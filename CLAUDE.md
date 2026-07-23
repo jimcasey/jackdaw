@@ -77,6 +77,10 @@ Instruments happen in Xcode. Expect that context switch.
 - **Naming:** corvid/crow theme for modules, features, and internal codenames.
 - **Decisions:** if it's a real decision, write it down (ADR or PRD) so it
   survives across sessions and the personas don't relitigate settled ground.
+- **Tracking vs. decisions (since v1):** bugs, feature ideas, and forward-looking
+  planning live in **[GitHub Issues](https://github.com/jimcasey/jackdaw/issues)** (the
+  backlog); `docs/` records **decisions and specs** — the durable "why" that travels
+  across sessions. Don't reintroduce to-do / backlog lists into the docs; file an issue.
 
 ## Development workflow (PRs & reviews)
 
@@ -87,11 +91,11 @@ Changes land via **pull request**, not direct pushes to `main`. Full process in
   buildable and green; don't push to it directly.
 - **Agent PR automation (owner-directed, standing):** after pushing a coherent
   change to its branch, the agent **opens the PR automatically** — it does **not**
-  wait for owner confirmation. It then watches `PR CI` on a **~5-minute** cadence (a
-  run takes ~5 min) and acts on the result: **green →** stop watching, hand back to
-  the owner for the next action (don't re-arm); **yellow** (still building) **→**
-  re-arm a ~5-min check; **red →** diagnose and push a fix. Full rules in
-  `docs/dev-workflow.md` §"Agent PR automation."
+  wait for owner confirmation — and then **stops**. The agent does **not** watch,
+  poll, or gate on `PR CI`. The **owner** notifies the agent when a PR is merged and
+  reports any CI/build errors back for the agent to fix. (Revised 2026-07-23 — the
+  earlier ~5-min CI check-back is retired.) Full rules in `docs/dev-workflow.md`
+  §"Agent PR automation."
 - **Reviews reuse the tripod**, each on its dimension — tech-lead (architecture,
   Swift, tests), design-lead (HIG, a11y, when UI changes), product-lead (scope,
   funnel principle) — plus the built-in `/code-review` for line-level mechanics.
@@ -114,7 +118,8 @@ machine-local and do **not** travel.
 
 - **Resuming Jackdaw?** Read `docs/STATUS.md` first — it's the living handoff:
   slice progress, the decision log with ADR pointers, the build/verify recipe and
-  gotchas, and the immediate next step.
+  gotchas, and the immediate next step. Open/backlog work (bugs, v1.x features,
+  decisions) lives in **GitHub Issues**, not the docs.
 - **Travels via git:** this file, everything in `docs/` (PRD, ADRs, design,
   build-order, slices, STATUS.md), `.claude/agent-memory/` (the personas reload
   their state — re-invoke them; prior agent *instances* don't survive a move),

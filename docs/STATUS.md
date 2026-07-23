@@ -67,23 +67,23 @@ files are the detailed specs.
   documented second adapter.
 
 ### Immediate next step — v1 is done
-No remaining v1 work. Optional **v1.x** items (all deferred, none blocking), rough
-priority:
-- **Real app icon + marketable name** — replace the placeholder icon and the
-  "JackdawNotes" store name (branding: product-lead + design-lead). See "Open/deferred".
-- **Reduce-Motion gating** for the toast / undo-banner transitions — design-lead polish
-  (neither is gated on `accessibilityReduceMotion`; flagged in the #13 review).
-- **Per-note stuck list** — only if the counts-only outbox proves too blunt in real
-  use; `returnToInbox` logic already ships, just needs the list UI.
-- **External capture surfaces** (Action button / Shortcuts / widget) via a
-  `CaptureNoteIntent` over the existing `CaptureService` seam — deferred per ADR 0005.
+No remaining v1 work. **Forward-looking work — v1.x features, open decisions, and the
+export bug-watch — is now tracked in [GitHub Issues](https://github.com/jimcasey/jackdaw/issues),
+not in this file.** In rough priority:
+- Branding: real app icon (#17) + marketable name (#18)
+- Reduce-Motion gating for the toast / undo-banner transitions (#19)
+- Per-note stuck list — only if the counts-only outbox proves too blunt (#20)
+- External capture surfaces via `CaptureNoteIntent` over the `CaptureService` seam — deferred per ADR 0005 (#21)
+- Snooze anti-graveyard nudge (#22) and midnight-boundary refinement (#23)
+- Decision: App Store vs. TestFlight-forever (#24)
 
 ### Recently landed
 **PRs #1–#15 are all merged to `main`.** The v1 funnel shipped across the feature
 slices — Apple Notes export (#9, follow-up #11) → Obsidian export (#12), with the
-"Saved to Obsidian" confirmation + its render fix (#13–#14). The dev workflow itself
-was hardened: **auto-open PRs** and a **durable 5-minute CI check-back** (#10, #15;
-session-only crons were silently dying on the remote runner — see `docs/dev-workflow.md`).
+"Saved to Obsidian" confirmation + its render fix (#13–#14). The dev workflow gained
+**auto-open PRs** (#10, #15); the paired **durable 5-minute CI check-back** was later
+**retired (2026-07-23)** — the agent now auto-opens PRs and stops, and the owner drives
+merges + error reports (see `docs/dev-workflow.md`).
 The Obsidian export path and both confirmations are **confirmed working on-device.**
 
 ---
@@ -109,51 +109,23 @@ Full scope in `docs/prd/mvp-scope.md`. Governing principle: **funnel, not archiv
 notes flow Capture → Triage → Export and leave; "home is never a growing browsable
 library." No browsing/search/history of exported notes.
 
-**Open/deferred (do not treat as settled):**
-- **Marketable name is still TBD.** "Jackdaw" is taken on the App Store, so the
-  store display name is a placeholder **"JackdawNotes"**; the codename `Jackdaw` and
-  bundle ID `com.jimcodes.Jackdaw` are unaffected. Revisit near release — a
-  product-lead call. See `.claude/agent-memory/product-lead/project_marketable-name.md`.
-- **App icon is a placeholder** (charcoal + pale circle, added to fix a TestFlight
-  ITMS icon-missing rejection). Needs a real design — a design-lead/branding task,
-  alongside the name. File: `Jackdaw/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`.
+**Open/deferred (tracked in GitHub Issues — do not treat as settled):**
+- **Marketable name** is still TBD (store display name is a placeholder **"JackdawNotes"**;
+  the codename `Jackdaw` and bundle ID `com.jimcodes.Jackdaw` are unaffected) — **#18**.
+  Rationale in `.claude/agent-memory/product-lead/project_marketable-name.md`.
+- **App icon** is a placeholder (`Jackdaw/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png`) — **#17**.
 - **Discard-undo banner** was shipped (Slice 4); the older "open call" in
   `docs/build-order.md` is settled.
 
 ### Field notes — on-device issues (watch for recurrence)
-- **2026-07-21 → largely RESOLVED 2026-07-22 — Obsidian export "not landing" on the
-  first on-device pass.** During the first Slice 7
-  on-device pass, kept notes did **not** appear in Obsidian **nor in the Files app**
-  (so nothing was written — *not* an Obsidian external-refresh/display issue, which
-  was explicitly ruled out), and Jackdaw showed **no export bar**. The notes were
-  still *in Jackdaw* (hold-until-confirmed protected them). It **healed** after the
-  owner renamed the destination folder, kept a new note, saw a **"Retry"** bar, and
-  tapped it — a deliberate `exportAll` that drained *all* the stuck notes into the
-  (renamed) folder; auto-export on subsequent keeps then worked.
-  - **What that fingerprint means:** a note invisible with no bar is stuck either
-    `.kept` (→ `OutboxSummary.draining` → silent by design) or `.writing` (excluded
-    from *every* `@Query`). So **auto-export-on-keep did not write and did not advance
-    the note to a `pending` failure** (which would have shown a bar). Leading
-    hypotheses: a stale/never-configured vault bookmark that auto-export hit without
-    surfacing; or notes stranded `.writing` and never reconciled until a full relaunch.
-  - **Mitigations shipped in the follow-up PR:** (1) a **"Saved to Obsidian"**
-    confirmation toast on a verified write — so a silent non-export is now immediately
-    visible (*no toast = nothing landed*); (2) the interrupted-write reconciler now
-    also runs **on foreground** (was cold-launch only), so a stranded `.writing` note
-    resurfaces as a Retry bar without needing a relaunch.
-  - **Resolution (2026-07-22):** on a later on-device pass, export **works** — notes
-    write to the vault and sync to Obsidian. Two things had made it *look* broken:
-    (a) the **"Saved to Obsidian" toast wasn't rendering** (a separate UI bug — the
-    transient shared the bottom inset and didn't surface; fixed in #14 by moving it to
-    an overlay, **confirmed on-device**), so there was no positive signal that anything
-    happened; and (b) the original stuck notes traced to a **vault-folder setup
-    mismatch**, cleared by the rename + Retry. The exact first-pass trigger was never
-    reproduced, so keep the fingerprint below — but the failure mode is now **guarded**:
-    a confirmed write shows the toast (*no toast = nothing landed*), and the reconciler
-    runs on foreground as well as launch.
-  - **If it recurs:** capture the export bar text (if any), whether the `.md` is in
-    the Files app at the picked folder, and the vault-setup state; consider adding a
-    temporary on-screen diagnostic (resolved vault path + last export outcome/error).
+- **Obsidian export "not landing" on the first on-device pass (2026-07-21 → largely
+  RESOLVED 2026-07-22).** Kept notes didn't write to the vault (nor appear in the Files
+  app) and no export bar showed; the notes stayed safe in Jackdaw (hold-until-confirmed),
+  and it healed via a destination-folder rename + **Retry**. Now **guarded**: a verified
+  write shows the "Saved to Obsidian" toast (*no toast = nothing landed*, #14) and the
+  interrupted-write reconciler runs on foreground as well as at launch. The exact
+  first-pass trigger was never reproduced — the full fingerprint, hypotheses, and the
+  "if it recurs" diagnostic checklist are in the tracking issue: **#25**.
 
 ---
 
@@ -208,7 +180,11 @@ library." No browsing/search/history of exported notes.
 ## Development workflow (how changes land)
 
 - **PRs, not direct pushes to `main`.** `main` is branch-protected and stays green.
-- **Flow:** branch → commit → `/open-pr` → `PR CI` + `/checkpoint-review` → merge.
+- **Flow:** branch → commit → `/open-pr` → `/checkpoint-review` → merge.
+- **Agent PR automation (revised 2026-07-23):** the agent **auto-opens** the PR after
+  a coherent push, then **stops** — it no longer watches or gates on `PR CI`. The
+  **owner** notifies of merges and reports CI/build errors back for the agent to fix.
+  (The earlier ~5-min CI check-back is retired.) See `docs/dev-workflow.md`.
 - **Commands:** `/open-pr` (scaffold a PR from the branch), `/checkpoint-review`
   (route the diff to the relevant tripod personas + built-in `/code-review`),
   `/handoff`, `/adr`, `/prd`.
