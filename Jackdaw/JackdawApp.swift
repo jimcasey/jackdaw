@@ -10,9 +10,9 @@ struct JackdawApp: App {
         WindowGroup {
             RootView()
         }
-        // Creates the SwiftData container (schema = Note), stores it in the app's
-        // Application Support directory inside the sandbox, and injects a main
-        // ModelContext into the environment. Unrelated to the Talon vault bookmark.
-        .modelContainer(for: Note.self)
+        // The shared container (ADR 0005/0008): the same instance backs the
+        // scene AND CaptureNoteIntent, so external captures and the in-app sheet
+        // write to one store. Unrelated to the Talon vault bookmark.
+        .modelContainer(AppModelContainer.shared)
     }
 }

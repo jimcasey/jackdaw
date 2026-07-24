@@ -20,6 +20,21 @@ struct CaptureService {
         return note
     }
 
+    /// One-shot commit for the external front-end (ADR 0005/0008): the intent
+    /// arrives with the *complete* text, so there is no draft, no autosave, no
+    /// pruning — insert a finished note and save synchronously (the intent
+    /// process may be suspended the instant `perform()` returns). Returns `nil`
+    /// (creating nothing) for whitespace-only input — the prune-on-abandon
+    /// convention, applied up front.
+    @discardableResult
+    func commit(text: String, in context: ModelContext) -> Note? {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let note = makeNote(body: trimmed, in: context)
+        persist(context)
+        return note
+    }
+
     func delete(_ note: Note, in context: ModelContext) {
         context.delete(note)
     }

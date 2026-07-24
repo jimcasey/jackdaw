@@ -30,4 +30,14 @@ GPS fix exists and backfill** the coordinate async (note can briefly be
 **Push-back expected:** product-lead may call priming/nudge friction — both are
 one-time and never block capture; would drop reduced-accuracy nudge before priming.
 
+**Priming trigger vs. external capture (ruled in PR #41 review):** priming fires
+only on Capture-*sheet* dismiss — correct **by construction** today: only sheet
+captures can carry location (no-launch intents are timestamp-only per ADR 0005),
+and slice E deep-links open the sheet, so every location-capable path passes the
+trigger. **Known gap deferred to slice F:** the last-known-location cache needs
+authorization to ever exist; if external capture dominates and the owner rarely
+opens the sheet, location stays un-primed and the cache stays empty. Revisit the
+trigger (e.g., prime on a Triage visit after N external captures) as part of
+slice F's design — not before.
+
 Full doc: `docs/design/open-ux-threads.md` (Thread 5).

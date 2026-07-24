@@ -41,4 +41,45 @@ struct CaptureServiceTests {
         service.persist(context)
         #expect(try noteCount(context) == 1)
     }
+
+    // MARK: - One-shot commit (the external front-end's path, slice A)
+
+    @Test func commit_insertsFinishedInboxNote() throws {
+        let context = try makeContext()
+        let note = CaptureService().commit(text: "from outside", in: context)
+        #expect(note?.body == "from outside")
+        #expect(note?.status == .inbox)
+        #expect(try noteCount(context) == 1)
+    }
+
+    @Test func commit_trimsSurroundingWhitespace() throws {
+        let context = try makeContext()
+        let note = CaptureService().commit(text: "  padded thought \n", in: context)
+        #expect(note?.body == "padded thought")
+    }
+
+    @Test func commit_whitespaceOnly_createsNothing() throws {
+        let context = try makeContext()
+        let note = CaptureService().commit(text: "   \n\t", in: context)
+        #expect(note == nil)
+        #expect(try noteCount(context) == 0)
+    }
+
+    @Test func commit_isTimestampOnly_noLocation() throws {
+        let context = try makeContext()
+        let note = CaptureService().commit(text: "external", in: context)
+        #expect(note?.hasLocation == false)
+    }
+
+    /// Pins the synchronous save — reading through a SECOND context on the same
+    /// container proves the note reached the store, not just the writer's
+    /// in-memory graph (an inserted-but-unsaved object is visible to its own
+    /// context, so same-context reads can't detect a missing `persist`).
+    @Test func commit_savesSynchronously_visibleToSiblingContext() throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Note.self, configurations: config)
+        _ = CaptureService().commit(text: "durable externally", in: ModelContext(container))
+        let reader = ModelContext(container)
+        #expect(try reader.fetch(FetchDescriptor<Note>()).count == 1)
+    }
 }

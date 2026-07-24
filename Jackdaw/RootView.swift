@@ -1,26 +1,47 @@
 import SwiftUI
 
-/// The app shell (ADR 0004): **Triage is the root; Capture is a modal sheet that
-/// auto-presents on launch.** After the first capture, if location hasn't been
-/// asked for yet, a one-time priming sheet explains why before the system prompt.
+/// The app shell (ADR 0004, amended by ADR 0008): **Triage is the root, bare** —
+/// the Capture sheet no longer auto-presents (flipped in capture-wave slice A,
+/// now that the Action button seeds the inbox from outside). In-app capture is
+/// the bottom-docked "New note" button. After the first capture, if location
+/// hasn't been asked for yet, a one-time priming sheet explains why before the
+/// system prompt.
 struct RootView: View {
     @Environment(\.modelContext) private var context
 
-    /// Single source of truth for auto-present-on-launch. Post-v1, once external
-    /// capture seeds the inbox (ADR 0005 fast-follow), flip the initial value to
-    /// `false` so the app opens to a bare Triage root.
-    @State private var showCapture = true
+    /// ADR 0004's endgame, ruled in the capture-wave plan §7.1: launch opens to
+    /// the bare Triage root. Escape hatch on record: revert to `true` without
+    /// debate if in-app capture is still dominant after ~2 weeks of real use,
+    /// clocked from when the Action button is actually configured.
+    @State private var showCapture = false
     @State private var showPriming = false
 
     var body: some View {
         NavigationStack {
             TriageRootView()
-                .toolbar {
-                    ToolbarItem(placement: .primaryAction) {
-                        Button("Capture", systemImage: "square.and.pencil") {
-                            showCapture = true
-                        }
+                // Primary capture chrome (design ruling, plan §7.1): a labeled,
+                // 44pt+ bottom-docked button — not just a nav-bar glyph. Attached
+                // to the stack's root so pushing the editor hides it; persists
+                // over the empty state (screen-inventory 1a keeps its CTA).
+                // TriageRootView's own bottom inset (undo banner / export bar)
+                // stacks above it.
+                .safeAreaInset(edge: .bottom) {
+                    Button {
+                        showCapture = true
+                    } label: {
+                        // "Capture", not "New note" — that label is reserved for
+                        // the sheet's keyboard-toolbar delimiter (banks the
+                        // thought and clears the field); reusing it on a control
+                        // with different behavior is an interaction-vocabulary
+                        // clash (design review, PR #41). One family: Capture
+                        // (button) / "Capture Note" (App Shortcut).
+                        Label("Capture", systemImage: "square.and.pencil")
+                            .frame(maxWidth: .infinity, minHeight: 44)
                     }
+                    .buttonStyle(.borderedProminent)
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                    .accessibilityHint("Opens the capture sheet")
                 }
         }
         .sheet(isPresented: $showCapture, onDismiss: maybePrimeLocation) {
