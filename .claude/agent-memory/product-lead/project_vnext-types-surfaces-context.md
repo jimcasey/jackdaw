@@ -47,6 +47,32 @@ below, then the rulings. Consult before relitigating.
 - Success criterion 1 (external majority) survives the 7.1 overrule as the
   **revert/keep metric** for the flip, no longer its precondition.
 
+## Slice A checkpoint review (PR #41, 2026-07-24) — my findings
+
+- **Scope fidelity: clean.** Ships exactly the A row (untyped, timestamp-only
+  intent; Shortcuts + Action button; the §7.1 flip). `JackdawShortcuts`
+  (AppShortcutsProvider) ruled **plumbing, not creep**: S1 proved a bare
+  intent is only an assemblable action; the provider is the minimal assembly
+  making "invoked from Shortcuts + Action button" true, and Siri/Spotlight it
+  lights up are inside the ratified §4 parameter lane. WATCH: the provider is
+  where future typed shortcuts accrete — slice B's one Listening shortcut is
+  ratified; anything beyond needs the plan.
+- **Funnel line: no drift.** Bare Triage root, bottom-docked "New note",
+  terse dialog copy ("Captured." confirms and closes — no view-note
+  affordance). Good.
+- **Finding I raised (fix-then-ship):** §7.1's ~2-week revert clock starts at
+  Action-button *configuration*, but nothing designates where the config DATE
+  gets recorded → asked for one line in spec validation step 2: record the
+  date in STATUS/issue #30 when configuring. Without a date the recalibrated
+  clock is unfalsifiable.
+- **Criterion 6.1 measurability: deliberately NO origin field on Note.** For
+  a single user, "is in-app capture still dominant" is answerable by the
+  owner's own memory; a stored origin marker is analytics-shaped metadata
+  that never exports. Incidental proxy: external notes are location-less —
+  but slice F (cached location) erodes that proxy later; don't rely on it.
+  Criterion 6.2 not evaluable until slice B (correct — nothing smuggled to
+  serve it early).
+
 ## The core ruling I argued: types are context bundles, not filing
 
 v1 banned "filing decision at capture time" (JTBD #1) and organizing (non-goal).
