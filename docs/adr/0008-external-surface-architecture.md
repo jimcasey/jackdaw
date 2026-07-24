@@ -6,6 +6,10 @@
 > **Amends ADR 0004** (the auto-present endgame now ships in capture-wave
 > slice A) **and ADR 0005** (external surfaces now scheduled; "no-launch = no
 > location" stands, extended with an untyped-only last-known-location cache).
+> **Refined 2026-07-23 by ADR 0009:** the context-via-parameters principle
+> gains one verified exception — the no-launch Apple-Music read (S1 spike:
+> works warm *and* cold) — used as best-effort enrichment; piped parameters
+> still win when supplied.
 > **Date:** 2026-07-23
 > **Owner of decision:** tech-lead (architecture + feasibility), design-lead
 > (surface UX), arbitrated by owner.
