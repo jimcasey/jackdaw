@@ -39,6 +39,7 @@ struct TriageRootView: View {
     @State private var exportConfirmation: String?   // transient "Saved to Obsidian" toast
     @State private var toastGeneration = 0           // guards the toast's dismiss timer
     @State private var refreshToken = 0   // bumped on appear/active to recompute due-ness
+    @State private var probeResult: String?   // SPIKE #29 — remove after the spike is confirmed
 
     private var outboxState: OutboxState { OutboxSummary.classify(outbox) }
 
@@ -78,6 +79,26 @@ struct TriageRootView: View {
         }
         .overlay { if visible.isEmpty { emptyState } }
         .navigationTitle("Triage (\(visible.count))")
+        // SPIKE #29 (capture-wave S1) — REMOVE AFTER THE SPIKE IS CONFIRMED.
+        // Foreground half of the now-playing probe: requests the media-library
+        // authorizations (first tap), then shows what the platform returns.
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Task { probeResult = await NowPlayingProbe.authorizeAndSnapshot() }
+                } label: {
+                    Label("Probe Now Playing", systemImage: "music.note")
+                }
+            }
+        }
+        .alert("Now-playing probe (foreground)", isPresented: Binding(
+            get: { probeResult != nil },
+            set: { if !$0 { probeResult = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(probeResult ?? "")
+        }
         .navigationDestination(for: Note.self) { note in
             NoteEditorView(note: note,
                            onKeep: { keep($0) },
