@@ -63,6 +63,17 @@ behavior may have changed.
   compiled into both targets and `openAppWhenRun=true`/`OpenIntent` (UIApplication is
   unavailable in extensions — Apple forums 758911/762479, WWDC23 10103).
 
+- **ITMS-90626 — App Intent strings must not contain "apple" (hit for real,
+  2026-07-23, spike #29 / PR #37):** App Store Connect delivery validation
+  rejects an upload whose Siri/App Intents-visible metadata (intent `title`,
+  `IntentDescription`, App Shortcut phrases) contains the word "apple" — the
+  spike intent's description said "Apple Music" and the TestFlight upload
+  bounced with *"Invalid Siri Support — App Intent description ... cannot
+  contain 'apple'"*. Say "system music player" / "the current song" instead.
+  Info.plist permission strings (e.g. `NSAppleMusicUsageDescription`'s value)
+  are NOT affected — the rule bites only intents-layer vocabulary. Matters for
+  slices C/D (media context) and any App Shortcut phrasing.
+
 - **iCloud write semantics:** writing to an iCloud-backed folder lands in the LOCAL
   iCloud mirror; upload is async/eventual. A successful local write != confirmed cloud
   upload. Fine for single-device; use `URLUbiquitousItemDownloadingStatus`/

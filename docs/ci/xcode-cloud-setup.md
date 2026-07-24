@@ -179,6 +179,18 @@ the gate clean).
 > **all** changed files are within the excluded folders." Sanity-check that a
 > docs-only merge is skipped and a code merge still builds.
 
+## Gotcha — ITMS-90626: App Intent strings must not contain "apple"
+
+Hit for real on the #29 spike (2026-07-23): the archive built and uploaded, then
+App Store Connect **delivery validation** rejected it — *"Invalid Siri Support —
+App Intent description ... cannot contain 'apple'"* — because an
+`IntentDescription` said "Apple Music". Any App Intents-visible string (intent
+`title`, `IntentDescription`, App Shortcut phrases) with "apple" in it bounces
+the upload. Info.plist permission strings are unaffected. Symptom profile: **the
+workflow runs green in Xcode Cloud but no build appears in TestFlight**, and the
+failure arrives by email — check the email/App Store Connect delivery log before
+suspecting start conditions.
+
 ## Gotcha — first-upload build number
 
 Slice 0 already uploaded a manual build under version **1.0**. If the first

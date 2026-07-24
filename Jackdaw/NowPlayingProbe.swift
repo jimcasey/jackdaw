@@ -77,8 +77,11 @@ enum NowPlayingProbe {
 /// force-quitting Jackdaw (cold) — prior reports suggest the two differ.
 struct NowPlayingProbeIntent: AppIntent {
     static let title: LocalizedStringResource = "Probe Now Playing"
+    // NOTE: App Intent-visible strings (title, description, shortcut phrases)
+    // must not contain "apple" — App Store Connect rejects the upload with
+    // ITMS-90626 ("Invalid Siri Support"). Say "system music player" instead.
     static let description = IntentDescription(
-        "Spike #29: reports what Jackdaw can see of the current Apple Music item without launching the app."
+        "Spike #29: reports what Jackdaw can see of the system music player's current item without launching Jackdaw."
     )
     static let openAppWhenRun = false
 
