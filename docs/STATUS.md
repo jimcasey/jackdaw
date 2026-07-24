@@ -6,9 +6,11 @@
 > below). Refresh this file with `/handoff` before switching sessions.
 
 **Last updated:** 2026-07-23 — **v1 is COMPLETE; the v1.x "capture wave" is
-PLANNED & RATIFIED.** The wave's plan (`docs/prd/capture-wave.md`) merged via
-PR #28 after a full tripod checkpoint review; ADRs 0007 + 0008 are drafted (in
-the current ADR PR); per-slice work is filed as issues #29–#35.
+RATIFIED with ALL THREE ADRs MERGED (0007/0008/0009) and spike S1 DONE.** The
+plan (`docs/prd/capture-wave.md`) merged via PR #28 after a tripod checkpoint
+review; the S1 now-playing spike ran on-device via the merge-then-revert
+TestFlight route (#37/#39, reverted) with a better-than-expected result
+(no-launch read works, ADR 0009). Slice work: issues #30–#35.
 
 ---
 
@@ -54,7 +56,7 @@ facts a fresh session must know:
 
 | # | Slice | Issue | Status |
 |---|-------|-------|--------|
-| S1 | Now-playing spike (foreground + no-launch read) — feeds media ADR | #29 | committed; **needs owner on device** |
+| S1 | Now-playing spike (foreground + no-launch read) | #29 | ✅ **done, on device** — read works foreground AND no-launch (warm + cold); ADR 0009 records it; probe reverted |
 | A | External skeleton: `CaptureNoteIntent` + Action button + ADR 0004 flip | #30 | committed; gated on ADR 0008 merge |
 | B | NoteType end-to-end (Listening shortcut only; location backfill) | #31 | committed; gated on ADR 0007 merge |
 | C | In-app now-playing (Apple Music) | #32 | ratified order, not committed; needs S1 + media ADR |
@@ -70,12 +72,11 @@ there), `docs/slices/slice-N-*.md`.
 
 ### Immediate next step
 
-1. **Merge the open ADR PR** (ADR 0007 + ADR 0008 + amended-by stamps on
-   ADRs 0004/0005 + this STATUS refresh).
-2. **Run the S1 spike (#29)** — needs the owner, a device, and Xcode; its
-   answer feeds the third ADR (media context), which should be written before
-   slice C.
-3. **Build slice A (#30)**, then **B (#31)** — the committed tranche.
+All three wave ADRs (0007/0008/0009) are ratified and S1 is done — the spike
+route was merge-then-revert via TestFlight (no local Xcode; see #38 for the
+proposed `spike/*` lane). **Next: build slice A (#30), then B (#31)** — the
+committed tranche. Slice C's design is unblocked by ADR 0009 (including the
+verified no-launch read + piped-parameters-win precedence).
 
 **Open issues:** #17 icon, #18 name, #19 reduce-motion (now also covers the
 wave's new transitions), #20 per-note outbox list, #22 snooze nudge,
@@ -98,7 +99,7 @@ Labels in use: `bug`, `enhancement`, `v1.x`, `needs-decision`, `a11y`,
 | CI / distribution | **Xcode Cloud LIVE** — `PR CI` required check; TestFlight on merge; agent never triggers cloud builds | ADR 0006, `docs/ci/xcode-cloud-setup.md` |
 | **Note types** | Capture-context bundles + 5 guardrails; `place`/`listening` hardcoded + untyped; frontmatter contract v2 (`type:` omitted for untyped); extensibility ladder | **ADR 0007**, `docs/prd/capture-wave.md` §1–2 |
 | **External-surface architecture** | Parameter vs launcher lanes; context-via-parameters; share route (3 guardrails, Listening-job-scoped); App Group deferred; location cache untyped-only; no foregrounding intent | **ADR 0008**, plan §4/§7 |
-| **Media context** | Apple Music = sole live source (foreground); Apple Podcasts/system-wide dead; Spotify + MediaRemote rejected | plan §3/§7.5 → **third ADR pending S1** |
+| **Media context** | Apple Music = sole live source; **no-launch read verified on-device (warm + cold)** → best-effort enrichment, piped parameters win; Apple Podcasts dead for pull (share route instead); Spotify + MediaRemote rejected; App Intent strings must not contain "apple" (ITMS-90626) | **ADR 0009**, plan §3/§7.5 |
 | Capture model | Autosave-as-you-type (lazy create, prune-on-abandon) | `docs/slices/slice-2-*.md` |
 | Retention | Hold-until-sync-confirmed | PRD, ADR 0001 |
 | Snooze / Discard | Calendar-day boundary / deferred hard-delete + undo | `docs/slices/slice-4-triage.md` |

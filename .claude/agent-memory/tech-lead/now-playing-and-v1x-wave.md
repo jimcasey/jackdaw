@@ -106,3 +106,16 @@ Slice F: last-known-location cache.
 See [[capture-nav-and-external]] for the v1 GPS gate this builds on; sources cited in
 the position paper (Apple forums threads 100187/809554/738477, WWDC refs, Overcast
 MacStories review, Spotify Web API reference).
+
+## S1 spike RESULTS (2026-07-23, owner device, iOS 26.x) — supersedes my "assume NO" posture
+
+Probe (PR #37/#39, reverted after confirmation): with Apple Music playing,
+`systemMusicPlayer.nowPlayingItem` AND MusicKit `SystemMusicPlayer` queue entry
+returned the current item in ALL THREE cases — foreground, no-launch intent with
+app backgrounded (warm), and no-launch intent after FORCE-QUIT (cold). Auth
+statuses readable throughout. The forum-reported background flakiness did NOT
+reproduce on iOS 26. Ruling (ADR 0009): direct no-launch read = verified
+best-effort enrichment; piped parameters win when supplied; nil read = silent
+media-less commit (affinity model absorbs it). Do not upgrade "best-effort" to
+"guaranteed" off one device/OS. Also: ITMS-90626 — App Intents-visible strings
+must not contain "apple" (hit on the spike upload; see ios-gotchas).
