@@ -29,7 +29,13 @@ struct RootView: View {
                     Button {
                         showCapture = true
                     } label: {
-                        Label("New note", systemImage: "square.and.pencil")
+                        // "Capture", not "New note" — that label is reserved for
+                        // the sheet's keyboard-toolbar delimiter (banks the
+                        // thought and clears the field); reusing it on a control
+                        // with different behavior is an interaction-vocabulary
+                        // clash (design review, PR #41). One family: Capture
+                        // (button) / "Capture Note" (App Shortcut).
+                        Label("Capture", systemImage: "square.and.pencil")
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .buttonStyle(.borderedProminent)

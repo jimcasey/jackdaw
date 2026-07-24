@@ -28,7 +28,13 @@ struct CaptureNoteIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
-        let context = ModelContext(AppModelContainer.shared)
+        // The scene's own context (legal here: perform() is @MainActor, and
+        // mainContext is @MainActor-isolated). Writing on it makes the Triage
+        // @Query refresh guaranteed-by-construction in the warm-app case —
+        // a sibling ModelContext's save reaching @Query without relaunch is
+        // undocumented merge behavior with a flaky history (tech-lead review,
+        // PR #41). Cold case is a fresh fetch at next launch either way.
+        let context = AppModelContainer.shared.mainContext
         guard CaptureService().commit(text: text, in: context) != nil else {
             // Whitespace-only input creates no note (the prune-on-abandon
             // convention, applied up front on the one-shot path).

@@ -25,10 +25,11 @@
   makes it a ready-made shortcut.)
 - **The ADR 0004 flip** — `RootView.showCapture` initial value `true → false`:
   launch opens to the bare Triage root. The nav-bar Capture glyph is replaced
-  by the **bottom-docked "New note" button** (labeled, ≥44pt,
+  by the **bottom-docked "Capture" button** (labeled, ≥44pt,
   `.borderedProminent`, attached to the stack root so pushing the editor hides
-  it; the empty state keeps it — screen-inventory 1a). TriageRootView's
-  undo-banner/export-bar inset stacks above it.
+  it; the empty state keeps it — screen-inventory 1a). "New note" stays
+  reserved for the sheet's keyboard-toolbar delimiter (review F1: one label,
+  one behavior). TriageRootView's undo-banner/export-bar inset stacks above it.
 
 ## Deliberately not in this slice
 
@@ -38,8 +39,9 @@ in-app capture sheet itself.
 
 ## Off-device verification
 
-Four new `CaptureServiceTests` cover the commit path (finished inbox note,
-trimming, whitespace-only → nothing, timestamp-only). **Test count: 80.**
+Five new `CaptureServiceTests` cover the commit path (finished inbox note,
+trimming, whitespace-only → nothing, timestamp-only, and a sibling-context
+read that pins the synchronous save). **Test count: 81.**
 The intent itself is a thin adapter over the tested seam — its `perform()` is
 not unit-tested (AppIntents runtime), by the same stance as the v1 view layer.
 
@@ -50,15 +52,27 @@ not unit-tested (AppIntents runtime), by the same stance as the v1 view layer.
    open Jackdaw → the note is in Triage, timestamped, no location.
 2. **Action button:** Settings → Action Button → Shortcut → **Capture Note**.
    Press-and-hold from anywhere (lock screen included) → capture → verify it
-   lands. *This starts the §7.1 escape-hatch clock (~2 weeks).*
-3. **Cold case:** force-quit Jackdaw, capture via Action button, reopen —
+   lands. *This starts the §7.1 escape-hatch clock (~2 weeks) — **record the
+   date you configure it** (a comment on issue #30, or STATUS.md), or the
+   window is unfalsifiable two weeks from now.*
+3. **Warm case:** with Jackdaw **backgrounded (not quit)**, capture via the
+   Action button → return via the app switcher → the note is in Triage
+   **without relaunching**. (This is where the `mainContext` review fix
+   lives — validate it even though it's fixed.)
+4. **Cold case:** force-quit Jackdaw, capture via Action button, reopen —
    note present. (S1 already proved the process model; this proves the write.)
-4. **Whitespace guard:** submit an empty/spaces-only prompt → "Nothing to
+5. **Whitespace guard:** submit an empty/spaces-only prompt → "Nothing to
    capture." → no note in Triage.
-5. **The flip:** launch Jackdaw → bare Triage root (no auto-sheet), "New
-   note" button docked at the bottom, still present on the empty state and on
-   the editor's dismissal; first-capture location priming still fires after a
-   sheet capture.
+6. **The flip:** launch Jackdaw → bare Triage root (no auto-sheet), the
+   **Capture** button docked at the bottom, still present on the empty state
+   and on the editor's dismissal; first-capture location priming still fires
+   after a sheet capture. Check the bottom-chrome stack: undo banner / export
+   bar sit **above** the Capture button, and the "Saved to Obsidian" toast
+   doesn't collide with it.
+7. **Accessibility pass:** (a) VoiceOver swipe-through order lands
+   list → export bar → Capture, and the button reads "Capture, button, Opens
+   the capture sheet"; (b) at AX5 Dynamic Type with the `needsSetup` bar up,
+   both stacked buttons stay legible and the list stays usable.
 
 ## Revert lever
 
