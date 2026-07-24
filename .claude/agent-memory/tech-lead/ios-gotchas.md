@@ -74,6 +74,36 @@ behavior may have changed.
   are NOT affected — the rule bites only intents-layer vocabulary. Matters for
   slices C/D (media context) and any App Shortcut phrasing.
 
+- **App Intents API facts verified for slice A review (2026-07-24, PR #41):**
+  `AppIntent.description` requirement is `static var description: IntentDescription?`
+  (OPTIONAL — Apple docs JSON), yet the canonical `static let description =
+  IntentDescription(...)` (non-optional) pattern works: it compiled in this repo's CI
+  (S1 probe) and its content demonstrably reached App Store Connect metadata
+  (ITMS-90626 fired *on* the description) — the build-time metadata extractor reads
+  the member, so don't "fix" it to optional. `AppShortcut` current init is
+  `init(intent:phrases:shortTitle:systemImageName:)` with **non-optional**
+  `shortTitle: LocalizedStringResource` (the optional-params variant is deprecated).
+  `IntentDialog` conforms to `ExpressibleByStringLiteral`/`Interpolation` → bare
+  strings fine for `requestValueDialog:` and `.result(dialog:)`.
+  `AppShortcutsProvider.appShortcuts` is `@AppShortcutsBuilder static var
+  appShortcuts: [AppShortcut]` — single-expression body compiles via result-builder
+  inference on protocol witnesses. Every phrase must embed `\(.applicationName)`.
+
+- **SwiftData cross-context @Query propagation — prefer `mainContext` from in-app
+  intents:** a `ModelContext(container)` sibling context's `save()` propagating into
+  the scene's `mainContext`/`@Query` *without relaunch* is undocumented behavior with
+  a history of iOS 17.x flakiness (forum reports: background/ModelActor saves not
+  refreshing @Query). An app-target App Intent whose `perform()` is `@MainActor` can
+  and should write via `container.mainContext` (it's `@MainActor`-isolated) — @Query
+  refresh is then guaranteed by construction for the warm-app case; the cold case is
+  a fresh fetch either way. Self-created contexts also have autosave off (explicit
+  `save()` needed — fine when the service saves synchronously).
+
+- **Xcode project uses filesystem-synchronized groups (objectVersion 77,
+  `PBXFileSystemSynchronizedRootGroup`):** new `.swift` files dropped into `Jackdaw/`
+  or `JackdawTests/` are picked up automatically — no `project.pbxproj` edit needed
+  when adding files without Xcode. Verified during the PR #41 first-compile audit.
+
 - **iCloud write semantics:** writing to an iCloud-backed folder lands in the LOCAL
   iCloud mirror; upload is async/eventual. A successful local write != confirmed cloud
   upload. Fine for single-device; use `URLUbiquitousItemDownloadingStatus`/

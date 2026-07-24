@@ -119,3 +119,16 @@ best-effort enrichment; piped parameters win when supplied; nil read = silent
 media-less commit (affinity model absorbs it). Do not upgrade "best-effort" to
 "guaranteed" off one device/OS. Also: ITMS-90626 — App Intents-visible strings
 must not contain "apple" (hit on the spike upload; see ios-gotchas).
+
+## Slice A review (PR #41, 2026-07-24) — verdict: fix-then-ship
+
+Reviewed the external skeleton (CaptureNoteIntent + AppModelContainer.shared +
+CaptureService.commit + ADR 0004 flip). Full API compile audit clean (facts
+recorded in ios-gotchas). One fix requested: intent should write via
+`AppModelContainer.shared.mainContext`, not a fresh `ModelContext(container)` —
+sibling-context → @Query propagation in the warm-app case is undocumented/flaky
+territory. Also asked: durability test via a second context (same-context
+`noteCount` passes even without `persist()`), and a warm-background case added
+to the on-device checklist. ITMS-90626 sweep of all intent-visible strings:
+clean. Seam discipline held (commit lives on CaptureService; intent is a thin
+adapter) — keep holding it for slices B–F.
