@@ -36,5 +36,5 @@ Do the following:
    - Remind the owner to **commit and push the working branch, then open/update
      its PR** (a remote session only sees pushed commits; changes land via PR, not
      direct pushes to `main` — see `docs/dev-workflow.md`), and that the build
-     environment on the far side needs **Xcode 26.x + the iOS 26 SDK** to
-     build/verify.
+     environment on the far side needs the **current stable Xcode** (26.x as of
+     2026-08) to build/verify.

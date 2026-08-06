@@ -77,9 +77,11 @@ None yet — there is no Xcode project. This section gets filled in with the
 walking skeleton (scheme name, simulator target, the `xcodebuild` test
 invocation, and any gotchas).
 
-Building/verifying on the far side of a session move needs **Xcode 26.x + the
-iOS 26 SDK**; a sandbox without Xcode can still edit code and drive the
-docs-based workflow.
+Building/verifying on the far side of a session move needs the **current stable
+Xcode** (26.x as of 2026-08); a sandbox without Xcode can still edit code and
+drive the docs-based workflow. Deliberately not pinned to an SDK version — the
+minimum deployment target is still undecided (#5), and iOS 27 is expected around
+September 2026.
 
 ---
 
