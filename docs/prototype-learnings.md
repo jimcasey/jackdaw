@@ -35,9 +35,12 @@ Three areas deserve particular care, because they sit right on the seam:
   paths, the destination seam) is the strongest promote candidate in the repo —
   but it was designed to run *after* triage, on notes a user had already sorted
   and classified. Check what it assumed the triage stage had already done.
-- **Tagging / classification** is being redesigned. The spike deferred it to
-  triage; here it has to happen at or near capture. Spike material on this is
-  useful as *evidence about the problem*, not as a design to copy.
+- **Tagging / classification** is a scope *expansion* here, not recovered work.
+  Get the history right: spike v1 banned organizing outright, and ADR 0007 put
+  type selection at the capture trigger — never in the flow, and deliberately
+  emitting `type:` frontmatter rather than Obsidian `tags:`. Read 0007 for its
+  reasoning about capture speed; treat it as evidence about the problem, not a
+  design to copy.
 - **Navigation** was shaped by triage-as-root. That shape is gone; re-derive it.
 
 Source material to mine, in the spike repo:

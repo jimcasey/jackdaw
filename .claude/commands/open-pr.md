@@ -41,5 +41,12 @@ Do the following:
 
 5. **Report to the owner:** the PR URL, the one-line summary, and a suggestion to
    run `/checkpoint-review` if this is a real checkpoint (a feature issue or a change with
-   meaningful judgment calls). Then offer to watch the PR for review comments and
-   CI via `subscribe_pr_activity`.
+   meaningful judgment calls).
+
+6. **Then stop.** Do **not** watch, poll, subscribe to, or gate on CI — no
+   `subscribe_pr_activity`, no check-back Routines. The owner reports merges and
+   CI failures back to you; that's your cue to pick up the next piece of work or
+   push a fix. This is the standing rule in `docs/dev-workflow.md` §"Agent PR
+   automation," and it exists because agent CI-watching proved brittle on the
+   spike — runs that queued or never started left the agent looping on a status
+   that never resolved.

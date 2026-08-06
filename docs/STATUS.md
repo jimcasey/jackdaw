@@ -43,10 +43,12 @@ not planned yet; that would presuppose the PRD.
 framing, but it feeds the scope, tagging, and export decisions rather than
 following them.
 
-**The sharpest open question** is where tagging sits (#3). The spike deferred
-classification to triage; with triage gone it has to happen at or near capture, and
-every control in the capture path costs capture speed — which is the whole product.
-Get design-lead on it rather than letting it get settled by default.
+**The sharpest open question** is where tagging sits (#3). Tagging is an
+owner-ratified scope *expansion*, not recovered triage work — the spike banned
+organizing in v1 and its unbuilt successor put type selection at the capture
+trigger, deliberately not as tags. Every control in the capture path costs capture
+speed, which is the whole product, so get design-lead on it rather than letting it
+get settled by default.
 
 ---
 
@@ -55,8 +57,8 @@ Get design-lead on it rather than letting it get settled by default.
 | Decision | Status | Where |
 |----------|--------|-------|
 | Triage/sorting is cut | Owner-directed, pre-PRD | `CLAUDE.md` §Scope reset |
+| Tagging is in — a deliberate scope expansion beyond the spike | Owner-ratified 2026-08-05; **specifics undesigned** | `CLAUDE.md` §Scope reset |
 | Export survives — the funnel keeps both ends | Owner-directed, pre-PRD | `CLAUDE.md` §Scope reset |
-| Tagging changes vs. the spike (no triage stage to defer it to) | Owner-flagged; **specifics undesigned** | `CLAUDE.md` §Scope reset |
 | Development workflow (PR + tripod review) | Carried over from spike | `docs/dev-workflow.md` |
 | Export destinations & mechanism | **Undecided** — spike's Obsidian/Apple Notes work is a reuse candidate | — |
 | Everything else (persistence, min iOS target, nav model) | **Undecided — re-decide, don't inherit** | — |
@@ -84,9 +86,10 @@ Three persona subagents in `.claude/agents/` — `product-lead`, `design-lead`,
 
 **Their memory is intentionally empty.** The spike's persona memory was *not*
 copied: starting the personas fresh is what keeps the scope cut real, since much
-of what they had learned assumed a triage stage — including how notes got
-classified, which is exactly what's being redesigned. Lessons worth keeping come
-back deliberately via issue #1, one at a time.
+of what they had learned assumed a triage stage — and their settled position on
+classification (ban it in v1; type at the trigger in v1.x) is the very thing the
+tagging expansion overrides. Lessons worth keeping come back deliberately via
+issue #1, one at a time.
 
 ---
 

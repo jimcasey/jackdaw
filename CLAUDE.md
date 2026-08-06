@@ -17,6 +17,10 @@ docs, not here.
   Capture → Export and leave the app; it never becomes their home. If a feature
   helps fast capture or clean handoff, it's in scope; if it moves toward
   organizing, searching, or browsing past notes, it's out.
+  **One ratified exception: tagging** (see §Scope reset). Tags are an organizing
+  primitive, so this genuinely stretches the principle — the owner has accepted
+  that trade deliberately rather than by drift. The principle still governs
+  everything else, and still rules out *browsing* past notes by tag.
 - **Relationship to the prototype:** this is a **restart**, not a continuation.
   A prior spike lives at `~/Code/jackdaw-spike`
   ([jimcasey/jackdaw-spike](https://github.com/jimcasey/jackdaw-spike)) and
@@ -35,15 +39,29 @@ but there is no batch-sorting stage in between.
 - **Out:** triage and everything built on it — batch sorting, swipe-to-keep or
   discard, snooze, a triage inbox as the app's root — and anything else that
   turns the app into a place you organize or browse past notes.
-- **Changing, not just shrinking:** dropping triage moves work that triage used
-  to do. Chief among them, **tagging notes at capture time** — the spike deferred
-  classification to the triage stage; here it has to happen at or near capture, or
-  not at all. Expect the capture screen, the note model, and the export mapping to
-  differ from the spike as a result. The planning session owns the specifics; the
-  design-lead owns the interaction cost of putting tagging in the capture path,
-  which is the sharpest tension in this scope (capture must stay fast).
-- **Open for planning:** the export destination(s) and mechanism (the spike shipped
-  Obsidian and Apple Notes paths), and how tagging works end to end.
+- **Added on purpose — tagging.** This is a scope *expansion*, owner-ratified,
+  and the one place this project deliberately goes beyond the spike. Be precise
+  about the history, because it's easy to get backwards: the spike did **not**
+  defer classification to triage. Its shipped v1 banned organizing outright ("no
+  folders, tags, categories, notebooks"), and its ratified-but-unbuilt successor
+  (spike ADR 0007) put type selection **at the capture trigger, never inside the
+  flow** — emitting a `type:` frontmatter field and *deliberately not* Obsidian
+  `tags:`. Neither position is inherited here. Tagging is new work, not recovered
+  work.
+- **The cost of that expansion:** tags are an organizing primitive, so tagging
+  stretches the funnel principle (see §Project) and competes directly with capture
+  speed — which is the whole product. Expect the capture screen, the note model,
+  and the export mapping to differ from the spike as a result. The design-lead owns
+  making that trade explicit rather than splitting the difference by reflex.
+- **Displaced by dropping triage** — triage was also doing keep/kill (the junk
+  filter), edit-before-export, context repair, the export trigger itself, and
+  failed-export recovery. Each needs a disposition in the PRD: dropped on purpose,
+  moved to capture, moved to export, or still open. Watch failed-export recovery in
+  particular — durable storage plus invisible notes plus a retry need reconstitutes
+  a "pending list," which is triage under another name.
+- **Open for planning:** what a tag *is* and where it's applied, the export
+  destination(s) and mechanism (the spike shipped Obsidian and Apple Notes paths),
+  and how tags land on the other side.
 
 Until the planning session lands a PRD, treat any scope claim inherited from
 the spike as unratified. The spike's export work is a **candidate to reuse**, not
