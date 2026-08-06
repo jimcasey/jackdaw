@@ -30,11 +30,13 @@ grouped by milestone — not in this file. Check the tracker for current state; 
 summary below is orientation only and goes stale.
 
 - **[M0 — Planning & decisions](https://github.com/jimcasey/jackdaw/milestone/1)**
-  — define the no-triage v1. Distill the prototype (#1), PRD (#2), tagging design
-  (#3), export decision (#4). No app code in this milestone.
+  — define the no-triage v1. Distill the prototype (#1), PRD (#2), classification
+  decision (#3), export decision (#4), persistence ADR (#6). No app code in this
+  milestone.
 - **[M1 — Walking skeleton](https://github.com/jimcasey/jackdaw/milestone/2)** —
-  deployment target (#5) and persistence (#6) ADRs, Xcode project (#7), TestFlight
-  (#8), Xcode Cloud CI (#9).
+  pure toolchain: deployment target ADR (#5), Xcode project (#7), TestFlight (#8),
+  Xcode Cloud CI (#9). Persistence (#6) moved to M0 — it depends on the export and
+  tagging decisions, and the skeleton needs no persistence.
 
 Later milestones — capture and export themselves — come out of M0. Deliberately
 not planned yet; that would presuppose the PRD.
@@ -56,10 +58,12 @@ get settled by default.
 
 | Decision | Status | Where |
 |----------|--------|-------|
-| Triage/sorting is cut | Owner-directed, pre-PRD | `CLAUDE.md` §Scope reset |
+| Triage/sorting is cut — superfluous; destination app edits, AI sorts later | Owner-directed 2026-08-05 | `CLAUDE.md` §Scope reset |
+| Export directly and fail loudly — no pending list, outbox, or retry queue | Owner-directed 2026-08-05 | `CLAUDE.md` §Simplicity rule |
 | Tagging is in — a deliberate scope expansion beyond the spike | Owner-ratified 2026-08-05; **specifics undesigned** | `CLAUDE.md` §Scope reset |
 | Export survives — the funnel keeps both ends | Owner-directed, pre-PRD | `CLAUDE.md` §Scope reset |
 | Development workflow (PR + tripod review) | Carried over from spike | `docs/dev-workflow.md` |
+| Squash-and-merge only; PR required on `main` (ruleset active) | Owner-directed 2026-08-05 | `docs/dev-workflow.md` §Merge strategy |
 | Export destinations & mechanism | **Undecided** — spike's Obsidian/Apple Notes work is a reuse candidate | — |
 | Everything else (persistence, min iOS target, nav model) | **Undecided — re-decide, don't inherit** | — |
 

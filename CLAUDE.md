@@ -34,6 +34,12 @@ The spike scoped the app as a funnel: Capture → **Triage** → Export. The new
 version **cuts triage.** The funnel keeps both ends — notes still leave the app —
 but there is no batch-sorting stage in between.
 
+**Why triage was cut** (owner, 2026-08-05): it proved to be a superfluous step in
+the notes workflow. A note that needs editing can be edited in the destination
+notes app, where it's going anyway; and sorting, if it's wanted at all, can be
+done with AI later, downstream. Triage was a stage the app maintained so the user
+could do work that the destination — or a later pass — does better.
+
 - **In:** fast, reliable capture of a fleeting note with ambient context
   attached automatically, and **export** of notes to the owner's notes system.
 - **Out:** triage and everything built on it — batch sorting, swipe-to-keep or
@@ -55,10 +61,27 @@ but there is no batch-sorting stage in between.
   making that trade explicit rather than splitting the difference by reflex.
 - **Displaced by dropping triage** — triage was also doing keep/kill (the junk
   filter), edit-before-export, context repair, the export trigger itself, and
-  failed-export recovery. Each needs a disposition in the PRD: dropped on purpose,
-  moved to capture, moved to export, or still open. Watch failed-export recovery in
-  particular — durable storage plus invisible notes plus a retry need reconstitutes
-  a "pending list," which is triage under another name.
+  failed-export recovery. Per the rationale above, the first three are **dropped on
+  purpose**: the destination app edits, and a later AI pass sorts. The last two are
+  governed by the simplicity rule below.
+
+## Simplicity rule: export directly, fail loudly (owner-directed, 2026-08-05)
+
+**Exporting directly and failing is better than maintaining machinery to avoid
+failure.** When export can't complete, say so plainly at the moment it happens.
+Do not build a surface where unexported notes accumulate and wait for the user to
+act on them one by one — that surface *is* triage, rebuilt under a new name, and
+it would arrive by increments nobody voted for.
+
+Concretely **out of scope**: a pending/outbox list, a retry queue with its own UI,
+an "unexported" badge or count, a failed-export review screen, per-note retry
+actions. Export status may be reported in the moment or in aggregate — never as a
+per-note work queue.
+
+This is the load-bearing constraint on the export design (#4) and the persistence
+decision (#6), both of which have a natural pull toward a durable queue. What
+should happen to a note whose export fails is still a real open question for the
+PRD — but it must be answered without reintroducing a decision surface.
 - **Open for planning:** what a tag *is* and where it's applied, the export
   destination(s) and mechanism (the spike shipped Obsidian and Apple Notes paths),
   and how tags land on the other side.

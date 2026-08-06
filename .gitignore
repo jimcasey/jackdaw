@@ -33,6 +33,14 @@ playground.xcworkspace
 
 .build/
 
+## Build artifacts
+build/
+DerivedData/
+*.xcresult
+
+## Claude Code machine-local settings (.claude/ is otherwise tracked)
+.claude/settings.local.json
+
 # CocoaPods
 #
 # We recommend against adding the Pods directory to your .gitignore. However

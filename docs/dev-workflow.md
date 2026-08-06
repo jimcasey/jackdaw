@@ -63,7 +63,9 @@ belongs in git, not in an issue body.
 ## Branching model
 
 - **`main`** is the trunk. It should always build and pass unit tests. Merge into
-  it via PR; don't push to it directly.
+  it via PR; don't push to it directly. This is **enforced**, not just convention:
+  a repository ruleset requires a pull request before merging to the default
+  branch (enabled 2026-08-05).
 - **Feature branches** are short-lived and descriptive. Two flavors:
   - **Owner / local work:** name for the issue it closes, e.g.
     `issue-12-capture-screen`, `issue-31-fix-autosave-debounce`.
@@ -93,7 +95,36 @@ branch  →  commit work  →  /open-pr  →  /checkpoint-review  →  address f
    tripod review + line-level `/code-review` and consolidates the feedback onto
    the PR.
 5. **Address feedback**, push follow-up commits to the same branch.
-6. **Merge** to `main` (owner's call — the owner arbitrates). Delete the branch.
+6. **Merge** to `main` with **squash and merge** (owner's call — the owner
+   arbitrates). The branch is deleted automatically.
+
+---
+
+## Merge strategy: always squash and merge
+
+**Squash and merge is the only strategy enabled** on this repo (owner-directed,
+2026-08-05); merge commits and rebase merging are turned off in repo settings, and
+the branch is deleted on merge. One PR becomes exactly one commit on `main`, which
+keeps `main`'s history a readable list of changes rather than a braid of WIP
+commits, and keeps the revert seam a single commit.
+
+**This makes the commit message the durable record**, so write it accordingly. The
+squash commit is configured as:
+
+- **Title** = the PR title, with `(#N)` appended automatically. That `#N` is the
+  permanent link back to the PR and its review discussion.
+- **Body** = the concatenated commit messages from the branch.
+
+Two consequences worth knowing:
+
+- **Write real commit messages.** They *are* the squash body — the durable "why"
+  that a `git log` or `git blame` six months out will surface. A branch of
+  `wip`/`fix typo` commits produces a useless permanent record.
+- **The `(#N)` reference is a pointer, not content.** Following it needs network
+  access and a live GitHub. Anything that must survive without GitHub — the real
+  reasoning behind a decision — belongs in the commit body, an ADR, or
+  `docs/specs/`, not only in the PR description. This is the same gap the
+  conditional-spec rule above is managing.
 
 ---
 
