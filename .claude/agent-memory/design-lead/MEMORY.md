@@ -1,3 +1,3 @@
 # Design Lead — Memory Index
 
-- [Design tensions (restart)](design-tensions-restart.md) — fresh-note re-entry vs no in-app edit gap (#2/#4); tagging trade's two failure directions (#3)
+- [Design tensions (restart)](design-tensions-restart.md) — edit-gap tension RESOLVED by owner ruling (destination fixes typos; don't re-raise); tagging trade's two failure directions (#3) still live

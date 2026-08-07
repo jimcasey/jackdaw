@@ -46,6 +46,10 @@ merged 2026-08-05). What actually happened in the field:
   volume, not filtering.
 - **And the vault stayed clean anyway.** Despite everything being kept, nothing
   landed in Obsidian that the owner later wished hadn't.
+- **Export in real use was Obsidian-only.** The Apple Notes path was exercised
+  only as its slice-6 milestone and never in day-to-day use — one destination
+  earned field evidence, the other is untested code. Decision-relevant for #4's
+  destination call.
 - **Field failures: exactly one.** The 2026-07-21 silent-export incident
   (spike `docs/STATUS.md` field notes, spike issue #25): kept notes silently
   stuck in-app, nothing written, **no failure surface and no success signal**
@@ -56,10 +60,13 @@ merged 2026-08-05). What actually happened in the field:
 
 ### What the evidence means for the restart
 
-1. **The triage cut is vindicated by the best data this project will ever
-   have.** The stage's one irreplaceable job — keeping junk out of the vault —
-   turned out not to exist: keep/kill filtered nothing, and the vault stayed
-   clean regardless. Cutting triage removes ceremony, not protection.
+1. **The field data is consistent with the triage cut — and it's the only
+   field data there will be.** At this volume, the stage's one irreplaceable
+   job — keeping junk out of the vault — found no work: keep/kill filtered
+   nothing and the vault stayed clean regardless. Three weeks and one user
+   can't prove junk never arrives; the cut's justification remains the owner's
+   workflow rationale (the destination edits; a later AI pass sorts), which
+   this data corroborates rather than carries.
 2. **The "fail loudly" rule is validated from the failure side.** The only real
    field failure was export failing *silently* — protected by
    hold-until-confirmed, but invisible. What fixed the experience was a loud,
@@ -84,7 +91,7 @@ merged 2026-08-05). What actually happened in the field:
 | Export write mechanism (folder write, bookmark, verify) | **Promote** | §3 | #4 |
 | Note serializer + frontmatter contract | **Promote** (contract details re-open with tagging) | §3 | #4, #3 |
 | Retention state machine + outbox surfacing | **Re-open** (collides with the simplicity rule) | §3 | #4 |
-| Capture model (autosave, prune, fresh-note re-entry) | **Promote** | §4 | #2, #15 |
+| Capture model (autosave, prune, fresh-note re-entry) | **Promote** (implementation posture contingent on #6) | §4 | #2, #15, #6 |
 | Ambient context: location mechanics + permission UX | **Promote** (whether v1 attaches location: open) | §5 | #12 |
 | Ambient context: now-playing / media | **Re-open** | §5 | #2 |
 | Classification / type system (ADR 0007) | **Re-open** — evidence, not a design to copy | §6 | #3 |
@@ -116,7 +123,10 @@ tech-lead memory `decision-obsidian-write.md`, `slice-1-spec.md`.
 - **Direct folder write into the Obsidian vault via a persisted security-scoped
   bookmark**, proven on-device 2026-07-14 across a cold relaunch, with the
   vault local (`On My iPhone/Obsidian`) and Obsidian Sync propagating to the
-  Mac (**topology T2**). Never run two sync engines on one vault.
+  Mac (**topology T2**). Never run two sync engines on one vault. T2's shape
+  is forced by a platform fact worth keeping: Obsidian-iOS can only open a
+  vault inside its own iCloud folder or its local On-My-iPhone container —
+  never an arbitrary folder, unlike desktop.
 - Why the alternatives lost — still true and worth not relitigating:
   `obsidian://` is fire-and-forget (no return channel, can't underwrite any
   confirmation model); the share sheet can't confirm the save and costs
@@ -172,18 +182,35 @@ question.** Two triage assumptions are also baked in: the machine's entry
 state is a human Keep decision, and its escape hatch for a permanently
 failing note is "return to inbox" — a place that no longer exists.
 
-What #4 must take from it rather than inherit:
+What #4 takes from it as evidence, not inheritance:
 
 - **The confirmation requirement is real.** "Bytes verified in the vault
   folder" vs "handed to iOS" is the distinction that made export trustworthy;
-  whatever replaces the state machine still needs a true success signal.
-- **State vs reason must stay separate fields.** A single opaque "failed" was
-  explicitly found insufficient — the reason is what makes failure actionable
-  (Retry vs Re-grant vs Set up vault).
-- **The poison-note wedge is unsolved under the new rules.** The spike's
-  checkpoint review found a permanently failing note wedges any retry surface;
-  its fix was triage-shaped. The simplicity rule bans the queue that made the
-  wedge visible — #4 must say what happens to that note instead.
+  whatever replaces the state machine still needs a true success signal. (This
+  one *is* a constraint — you cannot fail loudly without knowing you failed.)
+- **A coupling to name before anything else: the zero-vault-dependency
+  property promoted above entails durable unexported state.** If you can
+  capture for days before picking a folder, those notes are held somewhere,
+  unexported, by construction. What #4 re-opens is that state's *surfacing
+  and lifecycle* — the simplicity rule bans a per-note work queue, while
+  in-the-moment and aggregate reporting are explicitly permitted — not its
+  existence, unless #4 also gives up the pre-vault capture property.
+- **If failure is surfaced at all, surface the reason, not just the fact.**
+  A single opaque "failed" was found insufficient in the field — the reason
+  (no vault yet, access lost, bad write) is what made failure actionable.
+  Whether persisted failure state exists at all is #4's call under the
+  simplicity rule; this lesson binds only designs that have one.
+- **The poison-note wedge — pose it together with the coupling above, as one
+  question.** The spike's checkpoint review found a permanently failing note
+  pins even an aggregate status surface lit forever; its escape was
+  triage-shaped ("return to inbox"), which no longer exists. The answer space
+  is wider than a stored note: one legitimate shape resolves failure at
+  capture time — the text is still on screen, the user copies it out, nothing
+  failed is ever stored. Which shapes are available depends directly on the
+  zero-vault-dependency decision.
+- **The export trigger itself is open.** The spike's was "fires on Keep," and
+  Keep is gone — CLAUDE.md lists the trigger among what the triage cut
+  displaced.
 - **Silent success was field-tested and rejected.** The in-the-moment signal
   (toast) doubled as the diagnostic. "Fail loudly" should be read as "signal
   loudly, both ways."
@@ -227,13 +254,17 @@ scope-independent:
   `.onAppear`, which drops), keyboard up on arrival; note persisted before any
   GPS fix, context backfilled async with a `modelContext != nil` guard so a
   pruned note isn't resurrected; offline is a non-event by construction.
-- Implementation posture: rely on SwiftData's main-context autosave for
-  coalescing (don't `save()` per keystroke), one explicit save on
-  `.background`; one owner of save cadence, never two.
+- Implementation posture — **contingent on #6, because it is
+  SwiftData-specific**: rely on the main-context autosave for coalescing
+  (don't `save()` per keystroke), one explicit save on `.background`; one
+  owner of save cadence, never two. The durable rule is the last clause; the
+  mechanism is #6's to keep or replace.
 
 One clause dies with triage: "continuing to edit a captured note happens in
-Triage." The replacement is already decided by the scope reset — the
-destination edits.
+Triage." The replacement is decided — the destination edits — and the owner
+re-ratified it against the sharpest case at this doc's review (2026-08-06):
+a typo noticed seconds after banking is fixed at the destination if it
+matters. No in-app post-capture edit surface gets built for it.
 
 ---
 
@@ -252,7 +283,10 @@ Source: `docs/slices/slice-5-location.md`, tech-lead memory
 - One-shot fix done right: pre-warm `CLLocationManager` +
   `startUpdatingLocation` on sheet appear and cache the latest fix (rapid
   multi-capture shouldn't cold-spin GPS); **not** `requestLocation()` (~10s
-  cold) and not `CLLocationUpdate.liveUpdates` (no accuracy control).
+  cold) and not `CLLocationUpdate.liveUpdates` (no accuracy control — a
+  version-sensitive claim, verified against iOS 26 in 2026-07; the spike's
+  `LocationProviding` protocol hides the API choice, so it's swappable when
+  the platform moves).
 - Permission UX that never taxed capture: When-In-Use + precise, never Always;
   in-context priming sheet before the cold system prompt; first capture never
   interrupted; denied → timestamp-only with no per-capture nag.
@@ -285,16 +319,19 @@ Source: `docs/adr/0007-note-types-context-bundles.md`, product-lead memory
 `types-and-context.md`.
 
 Get the lineage right, because it's easy to invert: **the spike never had
-tags, and never deferred classification to triage.** Its shipped v1 banned
-organizing outright ("no folders, tags, categories"). Its ratified successor
-position (ADR 0007) allowed exactly two hardcoded *types* under the ruling
-that **a type is a capture-context bundle plus an export frontmatter contract
-— not an organizational taxonomy**: selection at the capture trigger only
-(the surface *is* the selection; no picker in the flow), untyped as the
-permanent default and fastest path, types never driving in-app organization,
-emitted as a plain `type:` frontmatter key and **deliberately not Obsidian
-`tags:`** — taxonomy is the vault's job. Type repair lived in triage, "where
-Jackdaw does decisions."
+tags, and never deferred type *selection* to triage** — selection happened at
+the capture trigger or not at all. Type *repair*, though, did live at triage
+(guardrail 5: editable/clearable there, "where Jackdaw does decisions"), and
+the spike's own design memory calls triage the filing moment — so
+trigger-selection was never the whole classification story. The record: its
+shipped v1 banned organizing outright ("no folders, tags, categories"). Its
+ratified successor position (ADR 0007) allowed exactly two hardcoded *types*
+under the ruling that **a type is a capture-context bundle plus an export
+frontmatter contract — not an organizational taxonomy**: selection at the
+capture trigger only (the surface *is* the selection; no picker in the flow),
+untyped as the permanent default and fastest path, types never driving in-app
+organization, emitted as a plain `type:` frontmatter key and **deliberately
+not Obsidian `tags:`** — taxonomy is the vault's job.
 
 Verdict: **re-open, all of it.** Jackdaw's tagging is an owner-ratified scope
 *expansion* the spike explicitly refused, so 0007 is not a design to copy in
@@ -314,6 +351,13 @@ either direction. What it contributes to #3 is evidence:
   without triage, and "types never drive in-app organization" was what kept
   labels from becoming browsing — a guardrail the funnel principle still
   demands in whatever form tags take.
+- **The trade fails in both directions, and #3 must price both.** A tagging
+  design that taxes capture fails the product; one that inherits 0007's
+  untyped-forever posture so tags are never actually applied fails the
+  ratified expansion — the owner accepted its cost deliberately, and a
+  vestigial feature doesn't honor that. Note also that trigger-selection has
+  zero usage evidence (the Listening shortcut shipped too late to judge), so
+  don't over-weight it as the proven pattern.
 - The persistence pattern if types/tags are stored — raw-string-backed field
   with a default (`typeRaw`), additive migration, unknown values degrade
   gracefully, behavior routed through one spec seam — promotes as technique
@@ -354,7 +398,12 @@ inherit.
   #2's navigation question, derived fresh from capture-first.
 - **One primary affordance, no duplicate chrome; labels are unique per
   action** ("Capture" ≠ "New note"). Transient chrome stacks above persistent
-  chrome.
+  chrome. The spike's own queued refinement carries too: a full-width bottom
+  CTA is mildly web-shaped; the iOS 26-native idiom is the prominent glass
+  glyph in a bottom toolbar (Notes, Reminders, Journal). And if #2's
+  navigation lands any root screen at all, empty-is-the-norm is the settled
+  pattern — `ContentUnavailableView`, designed as the resting state, not an
+  error.
 - Six technical patterns from the triage slice, all scope-independent:
   raw-string-backed enums for `#Predicate` reliability; state vs reason as
   separate persisted fields; no `Calendar` inside `#Predicate` (compute dates
@@ -382,8 +431,10 @@ the right seam shape regardless of scope.
 The *scope* re-opens, and the evidence cuts against ambition: the Action
 button — the spike's best-case external surface — never became habit, while
 Siri/Shortcuts and the plain app did the actual work. The restart should ship
-in-app capture (+ the intent seam, which Siri gets nearly free) and let
-demonstrated pull, not platform capability, justify each further surface.
+in-app capture plus the intent seam (the spike's tech-lead priced Siri as
+nearly free once the seam exists — a feasibility claim for #2/#7 to
+re-verify, not a settled fact) and let demonstrated pull, not platform
+capability, justify each further surface.
 
 ---
 
@@ -400,14 +451,22 @@ demonstrated pull, not platform capability, justify each further surface.
   shorter-lived and the store's job shrinks. The spike's *facts* carry into
   the decision: SwiftData worked without incident; `@Model`/`@Query` mapped
   cleanly to the owner's web mental model; it's built on Core Data, so it's
-  not a one-way door; and the capture model's autosave leans on the
-  main-context autosave behavior.
+  not a one-way door. And the promoted capture model is itself a real
+  decision force *for* SwiftData, not vibes: keystroke coalescing
+  (main-context autosave), kill-safety, and the pruned-note resurrection
+  guard all come from its behavior — any alternative store rebuilds them by
+  hand. §4's implementation posture hangs on this call.
 - **MVVM ↔ SwiftData split (→ #15): promote.** "Views own reads, a thin
   view-model owns write commands" — `@Query` is a View-only wrapper and can't
   be hoisted into a VM without losing reactivity; the VM stays
   SwiftUI-decoupled with the `ModelContext` injected per call, testable
   against an in-memory container. Fighting this with strict all-data-in-VM
-  MVVM fights the framework.
+  MVVM fights the framework. Corollary on the promoted intent path
+  (contingent on #6): an in-app App Intent writes via `container.mainContext`
+  — a self-created sibling context has autosave *off*, and its saves
+  propagating into a live `@Query` without relaunch is undocumented behavior
+  with a history of iOS 17.x flakiness. A session wiring Siri capture will
+  hit exactly this.
 - **Project mechanics (→ #7): promote.** The Xcode project format
   (filesystem-synchronized groups, objectVersion 77) picks up new `.swift`
   files automatically — no `project.pbxproj` surgery when adding files
@@ -464,7 +523,9 @@ isn't dropped by both issues.
 - **The a11y baseline** (scope-independent, per-screen): Dynamic Type via
   semantic styles only; every swipe action mirrored as VoiceOver custom
   actions + long-press menu; autosave silent to VoiceOver (announce once on
-  "New note", never per keystroke); ≥44pt targets; WCAG AA contrast; state
+  "New note", never per keystroke); sheet dismissal is a real,
+  VoiceOver-reachable button, never drag-to-dismiss alone (a drag gesture
+  isn't discoverable); ≥44pt targets; WCAG AA contrast; state
   never by color alone; Reduce Motion → cross-fade; system colors/materials
   make Dark Mode and Increase Contrast free.
 - **Native-feel risks for a web-shaped owner**: the boxed-textarea-plus-

@@ -20,9 +20,14 @@ notes; prune only removes empties) banks a fragment that exports as-is. The
 spike's triage inbox caught both softly; the restart has no net.
 **Why:** the scope reset priced deliberate edit-before-export, not the
 seconds-after-banking case.
-**How to apply:** #2/#4 must decide export *timing* relative to note-banking
-and what an interrupted fragment produces — an explicit owner decision, not a
-default. Do not resolve it by weakening the fresh-note rule.
+**RESOLVED — owner ruling, 2026-08-06 (PR #16 review):** the
+seconds-after-banking case is not a concern; a typo is fixed at the
+destination if it matters, and no in-app post-capture edit surface gets
+built for it. The ruling is recorded in `docs/prototype-learnings.md` §4.
+**How to apply now:** do not re-raise the edit gap in #2/#4. Export *timing*
+and what an interrupted fragment produces remain ordinary design questions
+for #4, but they are not motivated by an editing window — do not argue for
+one. The fresh-note rule stands.
 
 **2. Tagging trade has two failure directions — name both.**
 Capture speed is the constraint tagging is judged against (spike ADR 0007's
