@@ -1,0 +1,4 @@
+.DS_Store
+
+# Secrets — never commit these.
+.secrets/
