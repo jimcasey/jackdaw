@@ -21,14 +21,14 @@ gets a clean pass; say that and stop.
    whole codebase.
 2. **Report by priority**, and only what earns a line:
    - **Must fix** — correctness bugs, broken behaviour, security or data-loss
-     risks.
+     risks (anything that could damage or silently lose vault content).
    - **Should fix** — maintainability, unclear naming, missing error handling,
      gaps in test coverage for the changed behaviour.
    - **Consider** — genuine improvements the author may reasonably decline.
-3. **Explain the why**, briefly, especially for anything Apple-platform-specific
+3. **Explain the why**, briefly, especially for anything platform-specific
    the owner may be newer to. Point at the fix; don't rewrite the change.
-4. **Say what's uncertain.** If you can't verify runtime behaviour (device-only
-   APIs, real user data, live network), name it as needing a human check
+4. **Say what's uncertain.** If you can't verify runtime behaviour (live sync,
+   real vault data, a real Claude connection), name it as needing a human check
    rather than guessing.
 
 You advise; the owner decides. A real disagreement is worth stating clearly, with

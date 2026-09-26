@@ -2,9 +2,9 @@
 name: decision
 description: >-
   Record a project decision as a short, durable note (an ADR-lite). Use when a
-  real choice gets made — stack, architecture, data model, or a tradeoff worth
-  being able to explain later.
-argument-hint: [what was decided, e.g. "use SwiftData over Core Data"]
+  real choice gets made — stack, architecture, data model, write-safety model,
+  or a tradeoff worth being able to explain later.
+argument-hint: [what was decided, e.g. "run Headless Sync as a long-lived daemon"]
 ---
 
 Write a short decision record to `docs/decisions/`. Subject: $ARGUMENTS
