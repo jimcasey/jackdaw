@@ -10,8 +10,10 @@ keep it lean; put depth in linked notes and decision records, not here.
   Claude can **read** the vault to answer questions and **write** to it —
   organizing, editing, and creating notes — with changes syncing back to every
   device. Not an Obsidian plugin or a replacement editor.
-- **Status:** Project defined; no decisions recorded, no code yet. Next: feasibility
-  and architecture.
+- **Status:** Feasibility done — see
+  [architecture-proposal.md](docs/notes/architecture-proposal.md). Decided: every
+  change goes into git; hosted on a small always-on server. No code yet. Next:
+  pick a host, live-test `ob` and connector auth.
 - **Scope instinct:** favour the smallest thing that lets Claude read and safely
   change real vault content end to end. Resist building surface area before the
   sync and connector models are actually understood.
@@ -43,9 +45,9 @@ plus one research subagent.
 - **`explorer` subagent researches.** Hand it the heavy spelunking — mapping
   Headless Sync behaviour, the MCP/connector model, vault structure, auth flows,
   and gaps. It works in its own context and returns a tight digest, so raw
-  research doesn't crowd the main thread. Findings worth keeping land in `docs/notes/`. Invoke it
-  by name ("have the explorer map X") or let it pick up research-shaped tasks on
-  its own.
+  research doesn't crowd the main thread. Findings worth keeping land in
+  `docs/notes/`. Invoke it by name ("have the explorer map X") or let it pick up
+  research-shaped tasks on its own.
 - **Decisions get recorded.** Real choices (stack, hosting, write-safety model) get
   a short record via `/decision` in `docs/decisions/`, so they survive across
   sessions and don't get relitigated. Not every choice — just the ones you'd want

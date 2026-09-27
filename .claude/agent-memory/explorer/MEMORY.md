@@ -1,0 +1,3 @@
+- [Sync and safety facts](sync-and-safety-facts.md) — verified ob/Sync behaviours (dot-files unsynced, delete-propagation bugs, modes) + Claude annotation/permission model
+- [Headless Sync mapped](headless-sync-mapped.md) — ob v0.0.14 constraints (auth token env, watch/throttle, non-atomic writes); full note in docs/notes
+- [Claude connector surface](reference_claude_connector_surface.md) — remote MCP reachability, OAuth rules, permission features, SDK v2 status

@@ -2,3 +2,6 @@
 
 # Secrets — never commit these.
 .secrets/
+
+# Editor swap files.
+*.swp
